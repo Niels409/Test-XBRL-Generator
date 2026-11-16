@@ -1,0 +1,13 @@
+{
+  "name": "vt17-test-generator",
+  "version": "1.4.1",
+  "description": "Generates VT17 or VT15 (Vastgoedtaxonomie) test XBRL files from the Excel test-scenario template. Same generator as the VT17 Test Generator desktop app.",
+  "main": "src/functions/generate.js",
+  "scripts": {
+    "test": "node test-local.js template.xlsx"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  }
+}

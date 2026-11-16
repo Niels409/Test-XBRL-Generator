@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VT17 Test Generator</title>
+<style>
+:root{
+  --navy:#17324D; --navy-2:#21456A; --paper:#EEF2EF; --card:#FFFFFF; --ink:#17324D; --ink-2:#506579; --line:#CCD6D1;
+  --act:#0E6E73; --act-2:#0B5A5E; --act-soft:#DCEDEC; --parcel:#6FB7BA;
+  --ok:#2F7D4F; --ok-soft:#E1F0E6; --warn:#9A6210; --warn-soft:#F7ECD8; --bad:#B23A2E; --bad-soft:#F6E1DE;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--parcel);outline-offset:3px}
+
+/* kop: kadastrale kaart */
+.hero{position:relative;background:var(--navy);color:#EAF1F5;overflow:hidden;padding:44px 24px 150px}
+.hero svg{position:absolute;inset:0;width:100%;height:100%}
+.hero .in{position:relative;max-width:1180px;margin:0 auto}
+.hero h1{margin:0;font-size:40px;line-height:1.1;font-weight:700;letter-spacing:-.015em}
+.hero p{margin:12px 0 0;font-size:18px;max-width:58ch;color:#C5D4DE}
+
+/* stappen */
+main{position:relative;max-width:1180px;margin:-118px auto 0;padding:0 24px 40px}
+.flow{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;counter-reset:s}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:26px 26px 24px;display:flex;flex-direction:column;min-height:390px;box-shadow:0 18px 40px -28px rgba(23,50,77,.55)}
+.step.done{border-color:var(--act)}
+.step .head{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.num{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:20px;font-weight:700;background:var(--act-soft);color:var(--act)}
+.step.done .num{background:var(--act);color:#fff}
+.step h2{margin:0;font-size:22px;line-height:1.2}
+.step .lead{margin:0 0 18px;color:var(--ink-2)}
+.grow{flex:1;display:flex;flex-direction:column}
+.big{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:0;border-radius:8px;padding:16px 18px;font-size:17px;font-weight:650;cursor:pointer;background:var(--act);color:#fff;text-align:center}
+.big:hover{background:var(--act-2)}
+.big.alt{background:#fff;color:var(--act);border:2px solid var(--act)}
+.big.alt:hover{background:var(--act-soft)}
+.big:disabled{background:#C9D3CF;color:#fff;cursor:not-allowed;border-color:transparent}
+.big svg{width:20px;height:20px;flex:none}
+.cols{margin:auto 0 0;padding:16px 0 0;border-top:1px solid #E2E8E5;font-size:14px;color:var(--ink-2)}
+.cols b{color:var(--ink);font-weight:600}
+.cols ul{margin:6px 0 0;padding-left:18px}
+
+.drop{flex:1;min-height:170px;border:2px dashed var(--line);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:18px;cursor:pointer;background:#F7FAF8;transition:background .15s,border-color .15s}
+.drop:hover{border-color:var(--act)}
+.drop.over{border-color:var(--act);background:var(--act-soft)}
+.drop svg{width:34px;height:34px;color:var(--act)}
+.drop strong{font-size:17px}
+.drop span{font-size:14px;color:var(--ink-2)}
+.drop.loaded{border-style:solid;border-color:var(--act);background:#F2F8F7}
+.fname{font-weight:650;word-break:break-word}
+.err{margin-top:12px;padding:10px 12px;border-radius:6px;background:var(--bad-soft);color:var(--bad);font-size:14px}
+
+.stat{display:flex;align-items:baseline;gap:10px;margin:2px 0 6px}
+.stat .n{font-size:56px;line-height:1;font-weight:750;letter-spacing:-.02em}
+.stat .l{font-size:17px;color:var(--ink-2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
+.chip{border-radius:999px;padding:3px 11px;font-size:13.5px;font-weight:600}
+.c-ok{background:var(--ok-soft);color:var(--ok)}
+.c-warn{background:var(--warn-soft);color:var(--warn)}
+.c-bad{background:var(--bad-soft);color:var(--bad)}
+.issues{margin:0 0 14px;padding:0;list-style:none;font-size:14px;max-height:190px;overflow:auto;border-bottom:1px solid #EEF1EF}
+.issues li{padding:5px 0;border-top:1px solid #EEF1EF}
+.issues .id{font-family:var(--mono);font-size:13px;font-weight:600}
+.issues li{display:flex;gap:8px;align-items:baseline;justify-content:space-between}
+.issues .fn{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.issues .msg{display:block;font-size:13px;color:var(--ink-2)}
+.dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:6px}
+.d-ok{background:var(--ok)} .d-warn{background:var(--warn)} .d-bad{background:var(--bad)}
+.link{border:0;background:none;color:var(--act);font-weight:600;font-size:13px;cursor:pointer;padding:0;white-space:nowrap}
+.link:hover{text-decoration:underline}
+.note{font-size:13.5px;color:var(--ink-2);margin:0 0 14px}
+.placeholder{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink-2);font-size:15px;border-radius:10px;background:#F7FAF8;padding:18px;margin-bottom:16px}
+
+[hidden]{display:none!important}
+/* gegenereerde bestanden: blijven staan tot de volgende keer genereren */
+.files{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px 26px;box-shadow:0 18px 40px -28px rgba(23,50,77,.55)}
+.files .fhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.files h2{margin:0;font-size:22px}
+.files .meta{color:var(--ink-2);font-size:14px;flex:1}
+.btn{border:2px solid var(--act);background:#fff;color:var(--act);border-radius:7px;padding:8px 14px;font-size:14.5px;font-weight:650;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.btn:hover{background:var(--act-soft)}
+.btn.solid{background:var(--act);color:#fff}
+.btn.solid:hover{background:var(--act-2)}
+.btn svg{width:16px;height:16px}
+.flist{list-style:none;margin:10px 0 0;padding:0}
+.flist li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid #EEF1EF}
+.flist li.clickable{cursor:pointer}
+.flist li.clickable:hover{background:#F4F8F6}
+.flist .dot{margin-top:0}
+.flist .fn{font-family:var(--mono);font-size:14px;font-weight:600;word-break:break-all}
+.flist .sub{display:block;font-size:13.5px;color:var(--ink-2);margin-top:2px}
+.flist .warnmsg{display:block;font-size:13px;color:var(--warn);margin-top:2px}
+.flist .badmsg{display:block;font-size:13px;color:var(--bad);margin-top:2px}
+.flist .got{font-size:12.5px;color:var(--ok);font-weight:600}
+@media (max-width:600px){.files{padding:18px 16px}.flist li{grid-template-columns:auto 1fr}.flist li .btn{grid-column:2;justify-self:start}}
+
+footer{max-width:1180px;margin:0 auto;padding:0 24px 28px;font-size:13px;color:var(--ink-2)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:6px;font-size:15px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+
+@media (max-width:900px){
+  .flow{grid-template-columns:1fr}
+  .step{min-height:0}
+  .hero{padding-bottom:140px}
+  .hero h1{font-size:32px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <svg viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g fill="none" stroke="#6FB7BA" stroke-width="1.3" opacity=".28">
+      <path d="M0 60 L170 40 L250 150 L120 260 L0 240 Z"/><path d="M170 40 L430 22 L480 130 L250 150"/><path d="M250 150 L480 130 L540 300 L120 260"/>
+      <path d="M430 22 L660 55 L630 170 L480 130"/><path d="M630 170 L790 150 L830 300 L540 300"/><path d="M660 55 L900 30 L920 160 L790 150"/>
+      <path d="M900 30 L1080 70 L1060 200 L920 160"/><path d="M920 160 L1060 200 L1110 300 L830 300"/><path d="M1080 70 L1200 45 L1200 260 L1110 300"/>
+    </g>
+    <g fill="none" stroke="#EAF1F5" stroke-width="1.3" opacity=".35" stroke-dasharray="4 4">
+      <path d="M330 70 L385 66 L396 100 L343 104 Z"/><path d="M960 92 L1012 100 L1004 136 L952 128 Z"/>
+    </g>
+  </svg>
+  <div class="in">
+    <h1>VT17 Test Generator</h1>
+    <p>From Excel test scenarios to test XBRL files based on the Dutch real estate taxonomy (VT17 or VT15, chosen per row). Anything you leave out is filled in with realistic data.</p>
+  </div>
+</header>
+
+<main>
+  <div class="flow">
+    <section class="step" id="s1" aria-labelledby="h1">
+      <div class="head"><span class="num" aria-hidden="true">1</span><h2 id="h1">Fill in the template</h2></div>
+      <p class="lead">One row per test. Each row becomes one XBRL file.</p>
+      <div class="grow">
+        <button class="big alt" id="btnTemplate" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg>
+          Download template
+        </button>
+        <div class="cols">
+          <b>Per test you fill in</b>
+          <ul>
+            <li>Taxonomy (VT17 or VT15) and data product</li>
+            <li>Case ID and valuer report ID</li>
+            <li>Use: commercial, residential, mixed or agricultural</li>
+            <li>Address of the property</li>
+            <li>One or more VBO IDs, each with its use and market value</li>
+            <li>Valuation date and the valuer's CoC number</li>
+          </ul>
+          <p style="margin:8px 0 0">The rest of the XBRL is filled with realistic data.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s2" aria-labelledby="h2">
+      <div class="head"><span class="num" aria-hidden="true">2</span><h2 id="h2">Load your tests</h2></div>
+      <p class="lead">The completed template as .xlsx.</p>
+      <div class="grow">
+        <div class="drop" id="drop" tabindex="0" role="button" aria-describedby="dropState">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 15v4h16v-4"/></svg>
+          <strong id="dropTitle">Drop your Excel file here</strong>
+          <span id="dropState">or click to choose a file</span>
+        </div>
+        <input type="file" id="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        <div id="loadErr" class="err" hidden role="alert"></div>
+      </div>
+    </section>
+
+    <section class="step" id="s3" aria-labelledby="h3">
+      <div class="head"><span class="num" aria-hidden="true">3</span><h2 id="h3">Generate the XBRL files</h2></div>
+      <p class="lead">Each XBRL file is saved straight to your Downloads folder, ready to open.</p>
+      <div class="grow">
+        <div id="result" aria-live="polite"><div class="placeholder">Load your tests in step 2 first.</div></div>
+        <button class="big" id="btnGen" type="button" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg>
+          <span id="btnGenLabel">Generate and download XBRL files</span>
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <section class="files" id="files" hidden aria-labelledby="hf">
+    <div class="fhead">
+      <h2 id="hf">Generated XBRL files</h2>
+      <span class="meta" id="filesMeta"></span>
+      <button class="btn solid" id="btnAll" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg>
+        Download all again
+      </button>
+    </div>
+    <p class="note" style="margin:0">Click a file to download it again. This list stays until you generate new XBRL files.</p>
+    <ul class="flist" id="fileList"></ul>
+  </section>
+</main>
+<footer id="ver"></footer>
+<div class="toast" id="toast" role="status"></div>
+
+<script type="application/json" id="appdata">/*__APPDATA__*/</script>
+<script type="application/json" id="appdata15">/*__APPDATA15__*/</script>
+<script>/*__CORE__*/</script>
+<script>/*__XLSX__*/</script>
+<script>
+const TEMPLATE_B64 = "/*__TEMPLATE__*/";
+(function () {
+  'use strict';
+  const APP = JSON.parse(document.getElementById('appdata').textContent);
+  const APP15 = JSON.parse(document.getElementById('appdata15').textContent);
+  const model = { VT17: new VT17Core.Model(APP), VT15: new VT17Core.Model(APP15) };
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const GEN_LABEL = 'Generate and download XBRL files';
+  let scenarios = [], generated = [], overviewCsv = '';
+
+  $('ver').textContent = 'Taxonomies: Vastgoedtaxonomie ' + APP.version + ' and ' + APP15.version + ' · data products: ' + Object.keys(APP.eps).join(', ');
+
+  function toast(msg, ms) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), ms || 2600); }
+  function download(blob, name) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  const safe = (s) => String(s || '').replace(/[^\w.\-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60);
+  const fileName = (sc, r) => [safe(sc.id), r.tax === 'VT15' ? 'VT15' : '', safe(r.ep || sc.dataproduct)].filter(Boolean).join('_') + '.xbrl';
+  const plural = (n, one, more) => n + ' ' + (n === 1 ? one : more);
+  const xbrlBlob = (xml) => new Blob([xml], { type: 'application/xml' });
+
+  // terug naar de beginstand (zoals bij het openen van de app)
+  function resetAll() {
+    scenarios = [];
+    drop.classList.remove('loaded', 'over');
+    $('dropTitle').textContent = 'Drop your Excel file here';
+    $('dropState').textContent = 'or click to choose a file';
+    $('loadErr').hidden = true; $('loadErr').textContent = '';
+    $('s1').classList.remove('done');
+    $('s2').classList.remove('done');
+    $('btnGen').disabled = true;
+    resetStep3('Load your tests in step 2 first.');
+  }
+
+  function resetStep3(msg) {
+    generated = []; overviewCsv = '';
+    $('s3').classList.remove('done');
+    $('btnGenLabel').textContent = GEN_LABEL;
+    $('result').innerHTML = `<div class="placeholder">${esc(msg)}</div>`;
+  }
+
+  // ---------------------------------------------------------------- lijst met gegenereerde bestanden
+  let lastFiles = [];
+  const DL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg>';
+  function showFiles(items) {
+    lastFiles = items;
+    const ok = items.filter(x => x.xml).length;
+    const t = new Date();
+    $('filesMeta').textContent = `${plural(ok, 'file', 'files')} · generated at ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}` + (items.length > ok ? ` · ${items.length - ok} not generated` : '');
+    $('btnAll').hidden = ok < 2;
+    $('fileList').innerHTML = items.map((x, i) => {
+      const sub = [x.id !== x.caseId && x.caseId ? 'Case ' + x.caseId : '', x.ep, x.tax, x.desc].filter(Boolean).map(esc).join(' · ');
+      const msg = x.cls === 'd-warn' ? `<span class="warnmsg">${esc(x.msg)}</span>` : x.cls === 'd-bad' ? `<span class="badmsg">Not generated: ${esc(x.msg)}</span>` : '';
+      return x.xml
+        ? `<li class="clickable" data-i="${i}" title="Download again"><span class="dot ${x.cls}"></span><div><span class="fn">${esc(x.name)}</span><span class="sub">${sub}</span>${msg}</div><button class="btn" type="button" data-i="${i}">${DL_ICON}Download</button></li>`
+        : `<li><span class="dot d-bad"></span><div><span class="fn">${esc(x.id)}</span><span class="sub">${sub}</span>${msg}</div></li>`;
+    }).join('');
+    $('files').hidden = false;
+  }
+  $('fileList').onclick = (e) => {
+    const li = e.target.closest('[data-i]'); if (!li) return;
+    const x = lastFiles[+li.dataset.i]; if (!x || !x.xml) return;
+    download(xbrlBlob(x.xml), x.name);
+    toast(x.name + ' downloaded');
+  };
+  $('btnAll').onclick = async () => {
+    const list = lastFiles.filter(x => x.xml);
+    for (let i = 0; i < list.length; i++) { download(xbrlBlob(list[i].xml), list[i].name); if (i < list.length - 1) await wait(400); }
+    toast(plural(list.length, 'file', 'files') + ' downloaded');
+  };
+
+  // ---------------------------------------------------------------- step 1
+  $('btnTemplate').onclick = () => {
+    const bin = atob(TEMPLATE_B64); const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    download(new Blob([u], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'VT17 test scenarios template.xlsx');
+    $('s1').classList.add('done');
+    toast('Template downloaded');
+  };
+
+  // ---------------------------------------------------------------- step 2
+  const drop = $('drop');
+  drop.onclick = () => $('file').click();
+  drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } };
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); };
+  $('file').onchange = (e) => { if (e.target.files[0]) load(e.target.files[0]); e.target.value = ''; };
+
+  async function load(file) {
+    $('loadErr').hidden = true;
+    try {
+      const rows = await VT17Xlsx.readFirstSheet(await file.arrayBuffer());
+      const list = VT17Xlsx.rowsToScenarios(rows);
+      if (!list.length) throw new Error('No tests found. Fill in at least the Data product.');
+      scenarios = list;
+      const per = {};
+      for (const sc of list) { const ep = model.VT17.resolveEp(sc.dataproduct) || (sc.dataproduct || 'unknown data product'); per[ep] = (per[ep] || 0) + 1; }
+      drop.classList.add('loaded');
+      $('dropTitle').innerHTML = `<span class="fname">${esc(file.name)}</span>`;
+      $('dropState').innerHTML = `${esc(plural(list.length, 'test', 'tests'))}: ${Object.entries(per).map(([k, v]) => esc(v + '× ' + k)).join(', ')}<br>Click to choose another file`;
+      $('s2').classList.add('done');
+      $('btnGen').disabled = false;
+      resetStep3(`${plural(list.length, 'test', 'tests')} ready to generate.`);
+    } catch (err) {
+      resetAll();
+      $('loadErr').textContent = err.message || String(err); $('loadErr').hidden = false;
+    }
+  }
+
+  // ---------------------------------------------------------------- step 3
+  $('btnGen').onclick = async () => {
+    $('btnGen').disabled = true;
+    $('btnGenLabel').textContent = 'Generating…';
+    const today = VT17Core.todayUTC();
+    const rows = [['Test ID', 'Scenario description', 'Data product', 'Case ID', 'Taxonomy', 'VBO IDs', 'VBO uses', 'File', 'Generated', 'Taxonomy deviations', 'Warnings', 'Applied', 'Messages']];
+    generated = [];
+    const items = [];
+    let valid = 0, dev = 0, failed = 0;
+    for (const sc of scenarios) {
+      let r;
+      try { r = VT17Core.generate(model, sc, { today }); }
+      catch (e) { r = { ok: false, errors: ['Unexpected error: ' + (e.message || e)], warnings: [], log: [] }; }
+      const name = r.ok && r.xml ? fileName(sc, r) : '';
+      if (name) {
+        generated.push({ name, xml: r.xml });
+        const n = r.validation.errors.length;
+        const base = { name, id: sc.id, xml: r.xml, ep: r.ep, tax: r.tax, caseId: sc.caseId, desc: sc.omschrijving };
+        if (n) { dev++; items.push(Object.assign(base, { cls: 'd-warn', msg: `${plural(n, 'deviation', 'deviations')} from ${r.tax}: ${r.validation.errors[0]}` })); }
+        else { valid++; items.push(Object.assign(base, { cls: 'd-ok', msg: '' })); }
+      } else { failed++; items.push({ cls: 'd-bad', name: '', id: sc.id, ep: r.ep || sc.dataproduct, tax: r.tax || sc.taxonomy, caseId: sc.caseId, msg: r.errors[0] || 'Not generated' }); }
+      rows.push([sc.id, sc.omschrijving, r.ep || sc.dataproduct, sc.caseId, r.tax || sc.taxonomy || '', (r.vbos || sc.vbos || []).join(' '), (sc.vboUses || []).join(' '), name, name ? 'yes' : 'no',
+        r.validation ? r.validation.errors.length : '', (r.warnings || []).length + (r.validation ? r.validation.warnings.length : 0),
+        (r.log || []).join(' | '), [...(r.errors || []), ...(r.validation ? r.validation.errors : []), ...(r.warnings || []), ...(r.validation ? r.validation.info : [])].join(' | ')]);
+    }
+    overviewCsv = '﻿' + rows.map(r => r.map(c => { const s = String(c == null ? '' : c); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\r\n');
+
+    const ok = generated.length;
+
+    // XBRL-bestanden los downloaden, kort na elkaar
+    for (let i = 0; i < generated.length; i++) {
+      download(xbrlBlob(generated[i].xml), generated[i].name);
+      if (i < generated.length - 1) await wait(400);
+    }
+    // melding, daarna terug naar de beginstand
+    const bad = items.filter(x => x.cls === 'd-bad').map(x => x.id);
+    let msg = ok === 1 ? '1 XBRL file saved to Downloads' : `${ok} XBRL files saved to Downloads`;
+    if (bad.length) msg += ` · not generated: ${bad.join(', ')}`;
+    if (dev) msg += ` · ${dev} with taxonomy deviations`;
+    toast(msg, bad.length || dev ? 7000 : 3000);
+    showFiles(items);
+    resetAll();
+  };
+})();
+</script>
+</body>
+</html>

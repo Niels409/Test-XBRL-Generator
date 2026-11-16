@@ -1,0 +1,8 @@
+node_modules/
+test/out/
+azure/core.js
+azure/xlsx.js
+azure/appdata.json
+azure/appdata-vt15.json
+__pycache__/
+.DS_Store
