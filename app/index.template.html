@@ -345,7 +345,8 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
 
     const ok = generated.length;
 
-    // XBRL-bestanden los downloaden, kort na elkaar
+    // lijst direct tonen, daarna de XBRL-bestanden los downloaden, kort na elkaar
+    showFiles(items);
     for (let i = 0; i < generated.length; i++) {
       download(xbrlBlob(generated[i].xml), generated[i].name);
       if (i < generated.length - 1) await wait(400);
@@ -356,7 +357,6 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
     if (bad.length) msg += ` · not generated: ${bad.join(', ')}`;
     if (dev) msg += ` · ${dev} with taxonomy deviations`;
     toast(msg, bad.length || dev ? 7000 : 3000);
-    showFiles(items);
     resetAll();
   };
 })();

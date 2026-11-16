@@ -290,14 +290,14 @@
 
     const fx = Object.assign({}, scenario.fixed || {});
     const filled = (v) => v !== undefined && v !== null && String(v).trim() !== '';
-    const isSpecial = (v) => typeof v === 'string' && /^(leeg|<leeg>|verwijderen|blanco)$/i.test(v.trim());
+    const isSpecial = (v) => typeof v === 'string' && /^(leeg|<leeg>|verwijderen|blanco|empty|<empty>|remove|delete|blank)$/i.test(v.trim());
 
     // waardepeildatum = datum van de contexten (en van de taxatie)
     let peil = addDays(today, -7);
     const peilRaw = filled(fx.waardepeildatum) && !isSpecial(fx.waardepeildatum) ? fx.waardepeildatum : scenario.peildatum;
     if (filled(peilRaw)) {
       const d = parseDateExpr(peilRaw, today);
-      if (d) peil = d;
+      if (d) { peil = d; if (d > today) warnings.push(`Valuation date ${isoDate(d)} is in the future; derived dates (inspection, previous valuations) follow it (intentional?).`); }
       else if (filled(fx.waardepeildatum)) warnings.push(`Valuation date "${peilRaw}" is not a valid date; contexts use today-7d and the field keeps the literal value (invalid XBRL).`);
       else errors.push(`Reference date "${peilRaw}" is not a valid date (use dd-mm-yyyy or e.g. today-7d).`);
     }
@@ -309,6 +309,7 @@
     // plaats van het object afleiden uit de gemeentecode van het eerste VBO-ID (indien bekend)
     const city = (firstGiven && CITIES.find(c => firstGiven.startsWith(c.g))) || r.pick(CITIES);
     let vbos = rawVbos.length ? rawVbos.map(v => v || bagId(r, city.g, '01')) : [bagId(r, city.g, '01')];
+    { const seenV = new Set(); for (const v of rawVbos.filter(Boolean)) { if (seenV.has(v)) warnings.push(`VBO ID ${v} appears more than once; its data is written twice (duplicate facts, intentional?).`); seenV.add(v); } }
     for (const v of rawVbos.filter(Boolean)) if (!/^\d{16}$/.test(v)) warnings.push(`VBO ID "${v}" is not in the 16-digit BAG format (intentional?).`);
     const pandId = bagId(r, city.g, '10');
     const otherId = bagId(r, city.g, '02');
@@ -383,6 +384,27 @@
       warnings.push(`Data product ${ep} has no BAG VBO data by default; VBO IDs are only used for fields with a VBO dimension.`);
     }
 
+    // ---- andere dataproducten met eenheden (Huurinformatie): alleen Eenheden/Ruimtes van het opgegeven gebruik
+    const useGiven = !!reportUse && reportUse !== '?' || givenUses.some(u => u && u !== '?');
+    if (!isTax && useGiven && facts.some(f => f.d.some(x => x[0] === 'frc-vt-dim:HouseAxis' || x[0] === 'frc-vt-dim:UnitAxis'))) {
+      const keepR = uses.has('r'), keepC = uses.has('c');
+      const before = facts.length;
+      facts = facts.filter(f => !((!keepR && f.d.some(x => x[0] === 'frc-vt-dim:HouseAxis')) || (!keepC && f.d.some(x => x[0] === 'frc-vt-dim:UnitAxis'))));
+      const firstOf = (u) => { const i = vboUse.indexOf(u); return i >= 0 ? vbos[i] : null; };
+      for (const f of facts) if (f.c === 'frc-vt-i:BAGVBOID' && !f.d.some(x => x[0] === DIM_VBO)) {
+        const v = f.d.some(x => x[0] === 'frc-vt-dim:HouseAxis') ? firstOf('r') : f.d.some(x => x[0] === 'frc-vt-dim:UnitAxis') ? firstOf('c') : null;
+        if (v) { f.v = v; f.fixedVbo = true; }
+      }
+      if (facts.length !== before) log.push(`${ep}: only ${[keepC && 'Ruimtes (commercial)', keepR && 'Eenheden (residential)'].filter(Boolean).join(' and ') || 'no units'} kept (${before - facts.length} facts removed)`);
+    }
+
+    // BAGVBOID-velden zonder VBO-as met een voorbeeldwaarde (bijv. 'BAGVBO-1' in Huurinformatie): naar een echt VBO
+    for (const f of facts) if (f.c === 'frc-vt-i:BAGVBOID' && !f.fixedVbo && !f.d.some(x => x[0] === DIM_VBO) && !/^\d{16}$/.test(f.v)) {
+      const want = f.d.some(x => x[0] === 'frc-vt-dim:HouseAxis') ? 'r' : f.d.some(x => x[0] === 'frc-vt-dim:UnitAxis') ? 'c' : null;
+      const i = want ? vboUse.indexOf(want) : -1;
+      f.v = vbos[i >= 0 ? i : 0];
+    }
+
     // ---- gebruiksspecifieke eenheden per VBO: Ruimte (commercieel), Eenheid (residentieel), Vastgoedobject (agrarisch)
     const unitOf = {};   // vbo index (1-based) -> {use, axis, member}
     if (isTax) {
@@ -423,6 +445,9 @@
             if (f.c === 'frc-vt-i:LinkedBAGVBOID') { if (!firstVid) return false; f.v = firstVid; }
             return true;
           });
+          // overige koppelingen in het commerciële deel (bijv. contractregels): naar het eerste commerciële VBO
+          for (const f of facts) if (f.g === 'c' && f.c === 'frc-vt-i:LinkedBAGVBOID' && !f.d.some(x => x[0] === axis || x[0] === DIM_VBO)) { f.v = firstVid; f.fixedLink = true; }
+          facts = facts.filter(f => !(f.fixedLink && !f.v));
         }
         log.push(`${USE_NAME[u]}: ${targets.length} ${name}${targets.length > 1 ? 's' : ''}` + (idx.length ? ' → ' + idx.map(i => 'VBO ' + (i + 1)).join(', ') : ' (no VBO of this use)'));
       }
@@ -449,6 +474,11 @@
     if (filled(fx.straat) && !isSpecial(fx.straat)) baseObjAddr.street = String(fx.straat).trim();
     if (hn) { baseObjAddr.number = parseInt(hn[1], 10); baseObjAddr.addition = hn[2] || ''; }
     if (filled(fx.toevoeging) && !isSpecial(fx.toevoeging)) baseObjAddr.addition = String(fx.toevoeging).trim();
+    // postcode met spatie of kleine letters ('3511 ab') normaliseren naar '3511AB'
+    if (filled(fx.postcode) && !isSpecial(fx.postcode)) {
+      const pm = /^\s*([1-9]\d{3})\s*([a-zA-Z]{2})\s*$/.exec(String(fx.postcode));
+      if (pm && pm[1] + pm[2].toUpperCase() !== String(fx.postcode)) { log.push(`Postcode "${fx.postcode}" written as ${pm[1] + pm[2].toUpperCase()}`); fx.postcode = pm[1] + pm[2].toUpperCase(); }
+    }
     if (filled(fx.postcode) && !isSpecial(fx.postcode)) {
       const pc = String(fx.postcode).trim().toUpperCase().replace(/\s+/g, '');
       baseObjAddr.postcode = pc;
@@ -502,13 +532,14 @@
         case 'LandRegisterCode': f.v = A.cityObj.k + '0' + r.int(0, 9); continue;
         case 'LandRegisterSection': f.v = 'ABCDEFGHKLMN'[r.int(0, 11)]; continue;
         case 'LandRegisterNumber': f.v = String(r.int(100, 9999)); continue;
+        case 'LandRegisterReference': if (/^(Aanduiding|Tekst)/i.test(f.v) || !f.v.trim()) f.v = `${A.cityObj.k}0${r.int(0, 9)} ${'ABCDEFGHKLMN'[r.int(0, 11)]} ${r.int(100, 9999)}`; continue;
         case 'OwnerAccordingToLandRegister': f.v = `${P.p.initials} ${P.p.prefix ? P.p.prefix + ' ' : ''}${P.p.family}`; continue;
         case 'FileName': f.v = 'bijlage_' + r.int(1, 9) + '.pdf'; continue;
         case 'MimeType': f.v = 'application/pdf'; continue;
         case 'SoftwareUsed': f.v = 'TaxatieSuite 2026'; continue;
         case 'SoftwareUsedReference': f.v = 'TS-' + r.digits(8); continue;
         case 'Reference': f.v = 'REF-' + today.getUTCFullYear() + '-' + r.digits(5); continue;
-        case 'LinkedBAGVBOID': { const vx = f.d.find(x => x[0] === DIM_VBO); f.v = vx ? vx[2] : f.vboIndex ? vbos[f.vboIndex - 1] : vbos[0]; continue; }
+        case 'LinkedBAGVBOID': { if (f.fixedLink) continue; const vx = f.d.find(x => x[0] === DIM_VBO); f.v = vx ? vx[2] : f.vboIndex ? vbos[f.vboIndex - 1] : vbos[0]; continue; }
         case 'BusinessNames': f.v = P.company; continue;
         case 'NameComplex': f.v = `${baseObjAddr.street} ${baseObjAddr.number}, ${baseObjAddr.city}`; continue;
         case 'PropertyName': { const B = f.vboIndex ? A : baseObjAddr; f.v = `${B.street} ${B.number}${B.addition ? ' ' + B.addition : ''}, ${B.city}`; continue; }
@@ -559,14 +590,14 @@
         targets = targets.filter(f => (f.d.find(x => x[0] === DIM_VBO) || [])[2] === vbos[n - 1]);
       }
       const special = typeof value === 'string' ? value.trim().toUpperCase() : null;
-      if (special === 'LEEG' || special === '<LEEG>' || special === 'VERWIJDEREN') {
+      if (['LEEG', '<LEEG>', 'VERWIJDEREN', 'EMPTY', '<EMPTY>', 'REMOVE', 'DELETE'].includes(special)) {
         if (!targets.length) { log.push(`${source}: not present, nothing removed.`); return; }
         facts = facts.filter(f => targets.indexOf(f) < 0);
         log.push(`${source}: removed (${targets.length}×).`);
         return;
       }
       let v, w = [];
-      if (special === 'BLANCO') v = '';
+      if (special === 'BLANCO' || special === 'BLANK') v = '';
       else ({ v, warn: w } = convertValue(model, c, value, today));
       w.forEach(x => warnings.push(`${source}: ${x}`));
       if (!targets.length) {
@@ -702,16 +733,45 @@
 
     for (const label of skippedCols) if (!appliedCols.has(label)) warnings.push(`Column "${label}" does not apply to ${ep} and was skipped.`);
 
+    // ---- VT17: huur- en koopreferenties in lijn met het gebruik (Soort referentie, IPD-type, agrarische velden)
+    if (isTax && TAX === 'VT17') {
+      const order = ['c', 'r', 'a'].filter(u => uses.has(u));
+      const REF_AX = ['frc-vt-dim:LeaseReferenceAxis', 'frc-vt-dim:SaleInvestmentReferencesAxis'];
+      const AGR_ONLY = ['BuildingBlocksAcreage', 'BuildingBlocksAmount', 'TypeSaleReferenceRuralAgricultural', 'CommercialBuildings', 'CommercialBuildingsAmount', 'CultivatedLand', 'CultivableLandAmount', 'HousesAcreage', 'HousesAmount', 'RightsAmount', 'OtherLand'];
+      const refs = [];
+      for (const f of facts) for (const x of f.d) if (REF_AX.includes(x[0]) && !refs.some(q => q[0] === x[0] && q[1] === x[2])) refs.push([x[0], x[2]]);
+      const useOf = {};
+      refs.forEach((q, k) => { useOf[q.join('|')] = order[k % order.length]; });
+      const refUse = (f) => { const x = f.d.find(y => REF_AX.includes(y[0])); return x ? useOf[x[0] + '|' + x[2]] : null; };
+      facts = facts.filter(f => {
+        const u = refUse(f); if (!u) return true;
+        const l = f.c.split(':')[1];
+        if (AGR_ONLY.includes(l) && u !== 'a') return false;
+        if (l === 'IPDSubtype' && u !== 'c') return false;
+        return true;
+      });
+      for (const f of facts) {
+        const u = refUse(f); if (!u) continue;
+        const l = f.c.split(':')[1];
+        if (l === 'ReferenceType') f.v = { c: '1', r: '2', a: '3' }[u];
+        if (l === 'IPDTypeProperty') f.v = u === 'r' ? '5' : u === 'a' ? '6' : (['1', '2', '3', '4'].includes(f.v) ? f.v : '3');
+      }
+      if (refs.length) log.push('References: ' + refs.map(q => `${q[1]} ${USE_NAME[useOf[q.join('|')]]}`).join(', '));
+    }
+
     // ---- marktwaarde per VBO: alleen residentiële eenheden hebben een marktwaarde per eenheid (Indicatieve marktwaarde VHE)
     if (isTax) {
       vbos.forEach((id, i) => {
-        const v = vboVals[i];
+        let v = vboVals[i];
         const un = unitOf[i + 1];
         const given = filled(v) && !isSpecial(v);
         if (!un || un.use !== 'r') {
           if (given) log.push(`VBO ${i + 1} (${USE_NAME[vboUse[i]]}): market value ${v} is part of the total; ${TAX} has no market value per ${USE_NAME[vboUse[i]]} unit.`);
           return;
         }
+        if (given && numOf(v) !== null && !Number.isInteger(numOf(v))) { log.push(`Market value VBO ${i + 1} ${v} rounded to whole euros`); v = Math.round(numOf(v)); vboVals[i] = v; }
+        if (given && numOf(v) === null) warnings.push(`Market value VBO ${i + 1} "${v}" is not a number; written as given (invalid XBRL).`);
+        else if (given && numOf(v) < 0) warnings.push(`Market value VBO ${i + 1} is negative (${v}) (intentional?).`);
         const val = given ? numOf(v) || 0 : r.int(18, 60) * 10000;
         const gbo = Math.max(30, Math.min(400, Math.round(val / 6000 / 5) * 5 || r.int(60, 160)));
         const huur = Math.max(1200, Math.round(val * 0.04 / 100) * 100);
@@ -742,15 +802,25 @@
           if (fr && !fr.error && part !== null) setField(fr, String(Math.round(part)), `Market value (${USE_NAME[u]} part) → ${fr.key}`);
         }
       }
-      // object-informatie in lijn met het gebruik
-      const only = uses.size === 1 ? [...uses][0] : null;
-      if (only === 'r' || only === 'a') {
-        for (const f of facts) if ((f.c === 'frc-vt-i:IPDTypeProperty' || f.c === 'frc-vt-i:ActualUse') && f.d.some(x => x[2] === 'frc-vt-dm:RealEstatePropertyTaxMember')) {
-          const e = ((APP.concepts[f.c] || {}).e || []).find(x => (only === 'r' ? /^woning/i : /landelijk|agrar/i).test(x[1]));
-          if (e) f.v = e[0];
-        }
-        facts = facts.filter(f => !(f.c === 'frc-vt-i:IPDSubtype' && f.d.some(x => x[2] === 'frc-vt-dm:RealEstatePropertyTaxMember')));
+    }
+
+    // ---- object-informatie (Sector type / Feitelijk gebruik) in lijn met het gebruik, alle dataproducten
+    if ((isTax || useGiven) && uses.size === 1) {
+      const only = [...uses][0];
+      const skipAx = ['frc-vt-dim:UnitAxis', 'frc-vt-dim:HouseAxis', 'frc-vt-dim:LeaseReferenceAxis', 'frc-vt-dim:SaleInvestmentReferencesAxis', 'frc-vt-dim:LeaseReferenceCommercialAxis', 'frc-vt-dim:SaleInvestmentReferencesCommercial', 'frc-vt-dim:SaleReferenceResidentialAxis', 'frc-vt-dim:TypeOfRealEstateAxis'];
+      const target = (f) => (f.c === 'frc-vt-i:IPDTypeProperty' || f.c === 'frc-vt-i:ActualUse' || f.c === 'frc-vt-i:IPDSubtype') && !f.d.some(x => skipAx.includes(x[0]));
+      const RX = { r: /^(woning|residentieel)/i, a: /landelijk|agrar/i };
+      const changed = new Set();
+      for (const f of facts) if (target(f) && f.c !== 'frc-vt-i:IPDSubtype') {
+        const E2 = (APP.concepts[f.c] || {}).e || [];
+        const cur = (E2.find(x => x[0] === f.v) || [])[1] || '';
+        let e = null;
+        if (only === 'r' || only === 'a') e = E2.find(x => RX[only].test(x[1]));
+        else if (/woning|landelijk|agrar/i.test(cur)) e = E2.find(x => /^kantoor/i.test(x[1]));
+        if (e && e[0] !== f.v) { f.v = e[0]; changed.add(JSON.stringify(f.d)); }
       }
+      if (only === 'r' || only === 'a') facts = facts.filter(f => !(f.c === 'frc-vt-i:IPDSubtype' && target(f)));
+      if (changed.size) log.push(`Sector type / actual use set to ${USE_NAME[only]}`);
     }
 
     // ---- aanpassingen uit het scenario

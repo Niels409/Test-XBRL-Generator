@@ -185,7 +185,9 @@
       const vboValues = [];
       const vboUses = vbos.map(() => '');
       for (const vc of vboCols) {
-        const id = cellStr(r[vc.id]);
+        let id = cellStr(r[vc.id]);
+        // Excel zet een VBO-ID als getal om en laat dan de voorloopnul vallen (15 i.p.v. 16 cijfers): herstellen
+        if (typeof r[vc.id] === 'number' && /^\d{15}$/.test(id)) id = '0' + id;
         const mv = vc.mv >= 0 ? r[vc.mv] : null;
         const use = vc.use >= 0 ? cellStr(r[vc.use]) : '';
         if (!id && !use && (mv === null || mv === undefined || String(mv).trim() === '')) continue;

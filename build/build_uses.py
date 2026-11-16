@@ -178,6 +178,22 @@ else:
     ext['r'] = {'facts': r, 'anchor': E['base']['anchor'], 'full': False}
     ext['a'] = {'facts': a, 'anchor': E['base']['anchor'], 'full': False}
 
+# commerciële eenheid zonder adres (VT15-voorbeeld): 'Adres ruimte' toevoegen zodat elk commercieel VBO aan een Ruimte gekoppeld wordt
+ufacts = [f for f in E['base']['facts'] if any(d[0] == 'frc-vt-dim:UnitAxis' for d in f['d']) and not any(d[0] == 'frc-vt-dim:LeaseContractAxis' for d in f['d'])]
+if ufacts and not any(any(d[0] == 'frc-vt-dim:BAGVBOIDAxis' for d in f['d']) for f in ufacts):
+    first = [d for d in ufacts[0]['d'] if d[0] == 'frc-vt-dim:UnitAxis'][0][2]
+    AD = [['frc-vt-dim:BAGVBOIDAxis', 't', 'BAGVBO-1'], ['frc-vt-dim:UnitAxis', 't', first]]
+    for c, v in (('frc-vt-i:LinkedBAGVBOID', 'BAGVBO-1'), ('nl-cd:StreetNameNL', 'Straat'), ('frc-vt-i:StreetNameNLFull', 'Straat'),
+                 ('nl-cd:HouseNumberNL', '1'), ('nl-cd:HouseNumberAddition', 'A'), ('nl-cd:PostalCodeNL', '1000AA'),
+                 ('nl-cd:PlaceOfResidenceNL', 'Plaats'), ('nl-cd:CountryCodeISO', 'NLD')):
+        f = fact(c, AD, v); f['g'] = 'c'; E['base']['facts'].append(f)
+    print('added Adres ruimte template')
+# huisnummertoevoeging in het adres van residentiële eenheden
+for src in ext.values():
+    hs = [f for f in src['facts'] if f.get('g') == 'r' and f['c'] == 'nl-cd:HouseNumberNL' and any(d[0] == 'frc-vt-dim:HouseAxis' for d in f['d'])]
+    for h in hs[:1]:
+        if not any(f['c'] == 'nl-cd:HouseNumberAddition' and f['d'] == h['d'] for f in src['facts']):
+            f = fact('nl-cd:HouseNumberAddition', h['d'], 'A'); f['g'] = 'r'; src['facts'].append(f)
 E['ext'] = ext
 A['tax'] = VER.upper()
 json.dump(A, open(P, 'w'), ensure_ascii=False, separators=(',', ':'))

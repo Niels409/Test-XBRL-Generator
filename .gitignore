@@ -6,3 +6,4 @@ azure/appdata.json
 azure/appdata-vt15.json
 __pycache__/
 .DS_Store
+test/deep_out/

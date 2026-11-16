@@ -57,6 +57,7 @@ and most conditional value assertions (VT17: 192 of 201, VT15: 258 of 270). This
 ./build.sh                 # template + offline HTML app + Azure Function zip (python3 + openpyxl, zip)
 node test/base_check.js    # official SBR Nexus examples against the validator
 node test/uses.js          # use scenarios for VT17 / VT15
+node test/deep.js          # 700+ scenarios: use separation, VBO links, field mapping, XBRL structure, edge cases (FUZZ=n for more)
 ```
 
 Recompiling `data/` from the taxonomies (only needed for a new taxonomy version) needs the SBR Nexus VT17/VT15 packages and example messages:

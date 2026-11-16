@@ -76,7 +76,7 @@ HELP = [
     ('How it works', 'One row per test. Each row becomes one XBRL file. Everything not listed here is filled in with realistic data.'),
     ('Required', 'Only Data product (marked with *). All other columns may be left empty. Taxonomy empty = VT17.'),
     ("VBOs", 'Up to 5 VBOs per test: VBO ID, its Use and its market value. Only the parts of the matching use are filled (commercial / residential / agricultural); Unlinked VBOs are not linked to a unit. The address applies to VBO 1.'),
-    ('Examples', 'The light blue rows are examples. Feel free to overwrite or delete them.'),
+    ('Examples & tips', 'The light blue rows are examples; overwrite or delete them. Negative test: type EMPTY in a field to leave it out of the XBRL; invalid values are written as given and shown as deviations.'),
 ]
 HELP_END = 4 + len(HELP)
 for i, (lab, txt) in enumerate(HELP):
