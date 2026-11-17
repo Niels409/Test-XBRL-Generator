@@ -18,7 +18,10 @@
     for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--) {
       if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
     }
-    if (eocd < 0) throw new Error('This is not a valid Excel file (.xlsx).');
+    if (eocd < 0) {
+      if (u.length > 8 && u[0] === 0xD0 && u[1] === 0xCF && u[2] === 0x11 && u[3] === 0xE0) throw new Error('This is an old Excel file (.xls) or a password-protected workbook. Save it as .xlsx without a password and try again.');
+      throw new Error('This is not a valid Excel file (.xlsx).');
+    }
     const n = dv.getUint16(eocd + 10, true);
     let p = dv.getUint32(eocd + 16, true);
     const files = {};
@@ -74,17 +77,17 @@
     const z = await unzip(buf);
     const wb = await z.text('xl/workbook.xml');
     if (!wb) throw new Error('This is not a valid Excel file (.xlsx).');
-    const firstSheet = /<sheet\b[^>]*r:id="([^"]+)"/.exec(wb) || /<sheet\b[^>]*\bid="([^"]+)"/.exec(wb);
-    let path = 'xl/worksheets/sheet1.xml';
+    // alle werkbladen in volgorde; het eerste blad met de sjabloonkop wint (anders het eerste blad)
     const rels = await z.text('xl/_rels/workbook.xml.rels');
-    if (firstSheet && rels) {
-      const re = new RegExp('<Relationship\\b[^>]*Id="' + firstSheet[1] + '"[^>]*>');
-      const rel = re.exec(rels);
-      if (rel) {
-        const t = /Target="([^"]+)"/.exec(rel[0])[1];
-        path = t.startsWith('/') ? t.slice(1) : 'xl/' + t.replace(/^\.\//, '');
-      }
+    const paths = [];
+    const shRe = /<sheet\b[^>]*?(?:r:id|\bid)="([^"]+)"[^>]*>/g;
+    let sm;
+    while ((sm = shRe.exec(wb))) {
+      const rid = (/r:id="([^"]+)"/.exec(sm[0]) || [])[1] || sm[1];
+      const rel = rels && new RegExp('<Relationship\\b[^>]*Id="' + rid + '"[^>]*>').exec(rels);
+      if (rel) { const t = /Target="([^"]+)"/.exec(rel[0])[1]; paths.push(t.startsWith('/') ? t.slice(1) : 'xl/' + t.replace(/^\.\//, '')); }
     }
+    if (!paths.length) paths.push('xl/worksheets/sheet1.xml');
     const sst = [];
     const ss = await z.text('xl/sharedStrings.xml');
     if (ss) {
@@ -95,8 +98,19 @@
         sst.push(textOf((m[1] || '').replace(/<rPh\b[\s\S]*?<\/rPh>/g, '')));
       }
     }
-    const xml = await z.text(path);
-    if (!xml) throw new Error('No worksheet found in the Excel file.');
+    let firstRows = null;
+    for (const path of paths) {
+      const xml = await z.text(path);
+      if (!xml) continue;
+      const rows = parseSheet(xml, sst);
+      if (!firstRows) firstRows = rows;
+      if (rows.some(r => r.some(c => typeof c === 'string' && /^(data ?product|test id|scenario-id)/i.test(c.trim())))) return rows;
+    }
+    if (!firstRows) throw new Error('No worksheet found in the Excel file.');
+    return firstRows;
+  }
+
+  function parseSheet(xml, sst) {
     const rows = [];
     const rowRe = /<row\b([^>]*)>([\s\S]*?)<\/row>/g;
     let rm;

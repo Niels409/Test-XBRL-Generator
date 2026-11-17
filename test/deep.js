@@ -188,17 +188,19 @@ function useChecks(X, sc, r, exp, fail) {
   if (vhe.length !== new Set(vhe.map(f => member(X, f, 'HouseAxis'))).size) fail('meerdere marktwaarden VHE per eenheid');
   // totale marktwaarde
   const vals = (sc.vboValues || []).filter(v => v !== '' && v !== undefined && v !== null);
+  const allVals = !!(sc.fixed && sc.fixed.marktwaarde) || (sc.vboValues || []).filter(v => v !== '' && v !== undefined && v !== null).length === r.vbos.length;
   const totalExp = sc.fixed && sc.fixed.marktwaarde ? +sc.fixed.marktwaarde : vals.length ? vals.reduce((a, b) => a + +b, 0) : null;
   if (totalExp !== null) {
     const va = X.facts.filter(f => loc(f.c) === 'ValuationAmount' && !hasAxis(X, f, 'PreviousValuationAxis'));
     if (!va.length) fail('Getaxeerde waarde ontbreekt');
-    else if (!va.some(f => +f.v === totalExp)) fail(`Getaxeerde waarde ${va.map(f => f.v)} ≠ ${totalExp}`);
+    else if (allVals && !va.some(f => +f.v === totalExp)) fail(`Getaxeerde waarde ${va.map(f => f.v)} ≠ ${totalExp}`);
+    else if (!allVals && !va.some(f => +f.v >= totalExp)) fail(`Getaxeerde waarde ${va.map(f => f.v)} < som opgegeven waarden ${totalExp}`);
   }
   // scope
   const sv = get(X, 'ScopeValuation');
   if (exp.scope && (!sv.length || sv[0].v !== exp.scope)) fail(`ScopeValuation ${sv.map(f => f.v)} ≠ ${exp.scope}`);
   // VT15: KPI marktwaarde per deel
-  if (tax === 'VT15' && totalExp !== null) {
+  if (tax === 'VT15' && totalExp !== null && allVals) {
     for (const [u, mem] of [['r', 'ResidentialPartRealEstateMember'], ['c', 'CommercialPartRealEstateMember']]) {
       if (!exp.uses.includes(u)) continue;
       const f = X.facts.find(x => loc(x.c) === 'MarketValueAfterTransferCostRounded' && loc(member(X, x, 'TypeOfRealEstateAxis') || '') === mem);

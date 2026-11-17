@@ -250,8 +250,11 @@
       case 'enum':
         if (!(c.e || []).some(([x]) => x === s)) return `"${s}" is not an allowed code`;
         break;
+
       case 'boolean': if (!/^(true|false|0|1)$/.test(s)) return `"${s}" is not a boolean`; break;
     }
+    if (c.k !== 'enum' && c.e && c.e.length && !c.set && !c.e.some(([x]) => x === s)) return `"${s}" is not an allowed value`;
+    if (c.e && c.e.length && c.set && s.split(/\s+/).filter(Boolean).some(t => !c.e.some(([x]) => x === t))) return `"${s}" contains a value that is not allowed`;
     if (c.minInclusive !== undefined && /^[-+]?[\d.]+$/.test(s) && parseFloat(s) < parseFloat(c.minInclusive)) return `${s} is below the minimum ${c.minInclusive}`;
     if (c.maxInclusive !== undefined && /^[-+]?[\d.]+$/.test(s) && parseFloat(s) > parseFloat(c.maxInclusive)) return `${s} is above the maximum ${c.maxInclusive}`;
     if (c.maxLength !== undefined && s.length > parseInt(c.maxLength, 10)) return `text longer than ${c.maxLength} characters`;
@@ -304,7 +307,10 @@
     const shiftFor = (anchorIso) => Math.round((peil - parseIso(anchorIso)) / 86400000);
 
     // ---- VBO's
-    const rawVbos = (scenario.vbos || []).map(x => String(x == null ? '' : x).trim());
+    const rawVbos = (scenario.vbos || []).map(x => String(x == null ? '' : x).trim()).map((x, i) => {
+      if (isSpecial(x)) { warnings.push(`VBO ID ${i + 1}: "${x}" is not possible for a VBO ID (it is the key of the VBO data); a generated ID is used.`); return ''; }
+      return x;
+    });
     const firstGiven = rawVbos.find(Boolean);
     // plaats van het object afleiden uit de gemeentecode van het eerste VBO-ID (indien bekend)
     const city = (firstGiven && CITIES.find(c => firstGiven.startsWith(c.g))) || r.pick(CITIES);
@@ -620,8 +626,10 @@
     // ---- case-ID
     if (scenario.caseId !== undefined && scenario.caseId !== null && String(scenario.caseId).trim() !== '') {
       const targetKey = (opts.caseTarget && opts.caseTarget[ep]) || defaultCaseTarget(model, ep);
-      const fr = model.resolveField(ep, targetKey);
-      if (fr.error) errors.push('Case ID: ' + fr.error);
+      const fr = targetKey ? model.resolveField(ep, targetKey) : { error: 'no field' };
+      if (isSpecial(String(scenario.caseId))) log.push('Case ID left out');
+      else if (!targetKey) warnings.push(`Case / Reference ID is not written: ${TAX} ${ep} has no assignment reference field (Opdrachtgever › Referentie holds the Process ID).`);
+      else if (fr.error) errors.push('Case ID: ' + fr.error);
       else {
         setField(fr, String(scenario.caseId).trim(), `Case ID → ${fr.key}`);
         // formuleregel: bij Reference hoort ReferenceAllocatedByPartyType in dezelfde context
@@ -663,12 +671,21 @@
       return t;
     };
     // marktwaarde per VBO -> totaal getaxeerde waarde (als er geen totaal is opgegeven)
-    const vboVals = scenario.vboValues || [];
+    const vboVals = (scenario.vboValues || []).slice();
     const numOf = (v) => { const t = convertValue(model, 'frc-vt-i:ValuationAmount', v, today).v; return /^-?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : null; };
     const givenVboVals = vboVals.filter(v => filled(v) && !isSpecial(v));
-    if (!filled(fx.marktwaarde) && givenVboVals.length) {
-      fx.marktwaarde = String(Math.round(givenVboVals.reduce((a, v) => a + (numOf(v) || 0), 0)));
-      log.push(`Total market value = sum of the VBO market values = ${fx.marktwaarde}`);
+    // Taxatierapport: VBO's zonder opgegeven marktwaarde krijgen een realistische waarde, zodat het totaal altijd de som van de VBO's is
+    const autoVal = {};
+    if (isTax) vbos.forEach((_, i) => {
+      if (filled(vboVals[i])) return;
+      const u = vboUse[i];
+      autoVal[i] = u === 'r' ? r.int(18, 60) * 10000 : u === 'c' ? r.int(40, 250) * 10000 : u === 'a' ? r.int(100, 400) * 10000 : r.int(2, 15) * 10000;
+    });
+    if (!filled(fx.marktwaarde) && (givenVboVals.length || Object.keys(autoVal).length)) {
+      const sum = vbos.reduce((a, _, i) => a + (autoVal[i] !== undefined ? autoVal[i] : (filled(vboVals[i]) && !isSpecial(vboVals[i]) ? numOf(vboVals[i]) || 0 : 0)), 0);
+      const extra = vboVals.slice(vbos.length).filter(v => filled(v) && !isSpecial(v)).reduce((a, v) => a + (numOf(v) || 0), 0);
+      fx.marktwaarde = String(Math.round(sum + extra));
+      log.push(`Total market value = sum of the VBO market values = ${fx.marktwaarde}` + (Object.keys(autoVal).length ? ' (VBOs without a value got a generated one)' : ''));
     }
     if (isTax && !filled(fx.useType)) {
       fx.useType = uses.has('a') ? '5' : uses.has('c') && uses.has('r') ? '3' : uses.has('r') ? '2' : '1';
@@ -772,7 +789,8 @@
         if (given && numOf(v) !== null && !Number.isInteger(numOf(v))) { log.push(`Market value VBO ${i + 1} ${v} rounded to whole euros`); v = Math.round(numOf(v)); vboVals[i] = v; }
         if (given && numOf(v) === null) warnings.push(`Market value VBO ${i + 1} "${v}" is not a number; written as given (invalid XBRL).`);
         else if (given && numOf(v) < 0) warnings.push(`Market value VBO ${i + 1} is negative (${v}) (intentional?).`);
-        const val = given ? numOf(v) || 0 : r.int(18, 60) * 10000;
+        if (isSpecial(v)) { facts = facts.filter(f => !(f.c === 'frc-vt-i:MarketValueVHE' && f.d.some(x => x[0] === un.axis && x[2] === un.member))); log.push(`VBO ${i + 1}: market value per unit left out`); return; }
+        const val = given ? numOf(v) || 0 : autoVal[i];
         const gbo = Math.max(30, Math.min(400, Math.round(val / 6000 / 5) * 5 || r.int(60, 160)));
         const huur = Math.max(1200, Math.round(val * 0.04 / 100) * 100);
         const mine = facts.filter(f => f.d.some(x => x[0] === un.axis && x[2] === un.member) && !f.d.some(x => x[0] !== un.axis && x[0] !== 'frc-vt-dim:HouseTypeAxis'));
@@ -843,8 +861,9 @@
 
   function defaultCaseTarget(model, ep) {
     const keys = model.APP.eps[ep].keys.map(k => k[0]);
-    for (const k of ['Opdrachtinformatie › Referentie', 'Klant › Referentie', 'Opdrachtgever › Referentie']) if (keys.indexOf(k) >= 0) return k;
-    return keys.find(k => / › Referentie$/.test(k));
+    for (const k of ['Opdrachtinformatie › Referentie', 'Klant › Referentie']) if (keys.indexOf(k) >= 0) return k;
+    // 'Opdrachtgever › Referentie' is the Process ID; never use it (or the valuer / attachment reference) for the case ID
+    return keys.find(k => / › Referentie$/.test(k) && !/^(Opdrachtgever|Opdrachtnemer|Bijlage) ›/.test(k)) || null;
   }
   function caseTargetOptions(model, ep) {
     return model.APP.eps[ep].keys.filter(([k, role, c]) => c === 'frc-vt-i:Reference' || c === 'frc-vt-i:SoftwareUsedReference').map(k => k[0]);
@@ -1036,6 +1055,8 @@
       if (!fits) errors.push(`${name}: dimension combination not allowed in ${ep} (${f.d.map(x => x[0].split(':')[1] + '=' + x[2]).join(', ') || 'no dimensions'}).`);
       const isNum = ['monetary', 'decimal', 'percent', 'area', 'length', 'energy', 'volume', 'integer'].indexOf(c.k) >= 0;
       if (isNum && !f.u) errors.push(`${name}: numeric fact without a unit.`);
+      if (!isNum && f.u) errors.push(`${name}: unit on a non-numeric fact.`);
+      if (isNum && f.u && c.k === 'monetary' && !/^iso4217:[A-Z]{3}$/.test(f.u.join('/'))) errors.push(`${name}: unit ${f.u.join('/')} does not fit a monetary amount (expected iso4217:EUR).`);
       const msg = checkValue(c, f.v);
       if (msg) (msg === 'empty text value' ? warnings : errors).push(`${name}: ${msg}.`);
       for (const x of f.d) if (x[1] === 't' && x[2] === '') errors.push(`${name}: empty value for typed dimension ${x[0]}.`);
@@ -1044,7 +1065,7 @@
     const seen = new Map();
     for (const f of facts) {
       const k = f.c + '#' + dimKey(f.d.slice().sort());
-      if (seen.has(k) && seen.get(k) !== f.v) errors.push(`${f.c.split(':')[1]}: appears twice with different values (${seen.get(k)} / ${f.v}).`);
+      if (seen.has(k)) errors.push(seen.get(k) !== f.v ? `${f.c.split(':')[1]}: appears twice with different values (${seen.get(k)} / ${f.v}).` : `${f.c.split(':')[1]}: duplicate fact (same context, value ${f.v}).`);
       seen.set(k, f.v);
     }
     // verplichte velden (existence-assertions uit de taxonomie)

@@ -296,7 +296,7 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
   $('file').onchange = (e) => { if (e.target.files[0]) load(e.target.files[0]); e.target.value = ''; };
 
   async function load(file) {
-    $('loadErr').hidden = true;
+    $('loadErr').hidden = true; $('loadErr').textContent = '';
     try {
       const rows = await VT17Xlsx.readFirstSheet(await file.arrayBuffer());
       const list = VT17Xlsx.rowsToScenarios(rows);

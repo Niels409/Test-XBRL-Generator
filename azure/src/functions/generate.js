@@ -15,7 +15,9 @@ app.http('generate', {
     try {
       const body = await request.json();
       if (!body || !body.contentBase64) return { status: 400, jsonBody: { error: 'Send { fileName, contentBase64 } with the .xlsx as base64.' } };
-      const result = await generateFromXlsx(Buffer.from(body.contentBase64, 'base64'));
+      const maxRows = parseInt(process.env.MAX_ROWS || '250', 10);
+      const result = await generateFromXlsx(Buffer.from(body.contentBase64, 'base64'), { maxRows });
+      if (result.tooMany) return { status: 413, jsonBody: { error: `The Excel file has ${result.tooMany} tests; at most ${maxRows} per call (the response would become too large). Split the file or raise the MAX_ROWS app setting.` } };
       return {
         status: 200,
         jsonBody: {

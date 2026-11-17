@@ -9,6 +9,8 @@ Server-side version of the VT17 Test Generator desktop app. Same generator code 
 | POST | `/api/generate` | `{ "fileName": "tests.xlsx", "contentBase64": "<xlsx as base64>" }` | `{ summary, files: [{ name, taxonomy, contentBase64, valid, deviations[], warnings[], dataProduct, caseId, processId }], failed: [{ test, row, errors[] }] }` |
 | GET | `/api/template` | – | `{ name, contentBase64 }` (Excel template) |
 
+At most 250 tests per call (app setting `MAX_ROWS`); more returns HTTP 413.
+
 Auth level `function`: call with header `x-functions-key: <key>` or `?code=<key>`.
 
 ## Run / deploy

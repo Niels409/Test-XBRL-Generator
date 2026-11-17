@@ -8,9 +8,11 @@ const models = { VT17: new Core.Model(require('./appdata.json')), VT15: new Core
 
 const safe = (s) => String(s || '').replace(/[^\w.\-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60);
 
-async function generateFromXlsx(buffer, opts = {}) {
+async function generateFromXlsx(buffer, opts) {
+  opts = opts || {};
   const rows = await Xlsx.readFirstSheet(buffer);
   const scenarios = Xlsx.rowsToScenarios(rows);
+  if (opts && opts.maxRows && scenarios.length > opts.maxRows) return { tooMany: scenarios.length };
   if (!scenarios.length) throw new Error('No tests found. Fill in at least the Data product.');
   const today = opts.today || Core.todayUTC();
   const files = [], failed = [];

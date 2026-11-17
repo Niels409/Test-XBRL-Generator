@@ -58,6 +58,8 @@ and most conditional value assertions (VT17: 192 of 201, VT15: 258 of 270). This
 node test/base_check.js    # official SBR Nexus examples against the validator
 node test/uses.js          # use scenarios for VT17 / VT15
 node test/deep.js          # 700+ scenarios: use separation, VBO links, field mapping, XBRL structure, edge cases (FUZZ=n for more)
+node test/review.js        # semantic consistency, validator self-test (injected errors), EMPTY markers, structure vs official examples
+python3 test/xsd_check.py test/deep_out <vt17 package dir> <vt15 package dir>   # independent check against the taxonomy XSDs
 ```
 
 Recompiling `data/` from the taxonomies (only needed for a new taxonomy version) needs the SBR Nexus VT17/VT15 packages and example messages:
