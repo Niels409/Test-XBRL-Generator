@@ -43,6 +43,7 @@ The taxonomies do not tie the commercial / residential / agricultural parts to t
 commercial VBOs get a *Ruimte* (+ *Adres ruimte*), residential VBOs an *Eenheid* (+ *Adres eenheid*), agricultural VBOs an object in the
 *Landelijk & Agrarisch* part, and unlinked VBOs appear only in the BAG VBO lists. Parts of uses that do not occur are left out.
 Only residential units have a market value per unit in the taxonomy; other VBO values count towards the total market value.
+In VT15 the taxonomy's own rules do not allow a BAG VBO ID per *Ruimte*, so there commercial VBOs are not linked to a Ruimte.
 
 ### Scenario library
 

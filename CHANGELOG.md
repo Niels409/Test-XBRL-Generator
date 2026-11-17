@@ -18,6 +18,13 @@ generated XBRL file and in the test report.
 - Template columns **Description** and **Expected result** (No deviations / Deviations / Not generated); the app and the
   test report show whether each outcome is as expected.
 
+### Fixed (found by the Arelle validation)
+- VT15 commercial and mixed reports: the unit address that linked a commercial VBO to its *Ruimte* (BAG VBO ID per unit)
+  violated VT15's own rules ("When `UnitAxis` is used, `UnitType`, `MarketRent`, ... MUST be reported with the same
+  dimensions"). It is no longer generated; in VT15 commercial VBOs are therefore not linked to a Ruimte.
+- The built-in check now evaluates these unit/axis rules exactly like Arelle (all dimensions must match), so it reports
+  this kind of problem as well.
+
 ### Changed
 - One name everywhere: **Test XBRL Generator** (app, template, scenario sets, Azure Function, macOS app).
 - VBO IDs in the 12-digit test format `2000000xxxxx` (also valid as Process ID) no longer give a BAG-format warning.

@@ -984,10 +984,15 @@
         if (prv.length === 1 && prv[0].seq && !prv[0].f.some(x => x.t === 'c' || x.t === 'or')) {
           const tf = prv[0].f.find(x => x.t === 't');
           if (!tf) continue;
-          const members = [...new Set(sel(prv[0], rule.set).map(f => dimVal(f, tf.a)))];
-          for (const m of members) {
-            const has = candAll.some(f => dimVal(f, tf.a) === m);
-            if ((rule.test === 'exists') !== has) errors.push(rule.msg.replace(/\{m\}/g, m) + ` [${rule.id}]`);
+          // XBRL-formula implicit filtering (as Arelle does): the typed-dimension filter does not cover its axis, so the conclusion
+          // must have exactly the same dimensions (axis values and any other axes) as each group of premise facts
+          const sig = (f) => f.d.map(x => x[0] + '=' + x[2]).sort().join('|');
+          const groups = new Map();
+          for (const f of sel(prv[0], rule.set)) if (!groups.has(sig(f))) groups.set(sig(f), f);
+          const candSigs = new Set(candAll.map(sig));
+          for (const [g, f] of groups) {
+            const has = candSigs.has(g);
+            if ((rule.test === 'exists') !== has) errors.push(rule.msg.replace(/\{m\}/g, dimVal(f, tf.a)) + (f.d.length > 1 ? ` (with ${f.d.filter(x => x[0] !== tf.a).map(x => x[0].split(':')[1] + ' ' + x[2].split(':').pop()).join(', ')})` : '') + ` [${rule.id}]`);
           }
           continue;
         }

@@ -128,11 +128,13 @@ function useChecks(X, sc, r, exp, fail) {
     const u = exp.vboUse[i];
     const L = (links[v] || []).filter(x => x.kind === 'r' || x.kind === 'c');
     if (u === 'r') { if (L.length !== 1 || L[0].kind !== 'r') fail(`VBO ${i + 1} (residentieel) moet aan precies 1 Eenheid gekoppeld zijn, gevonden: ${JSON.stringify(L)}`); else unitOfVbo[i] = L[0].unit; }
-    if (u === 'c') { if (L.length !== 1 || L[0].kind !== 'c') fail(`VBO ${i + 1} (commercieel) moet aan precies 1 Ruimte gekoppeld zijn, gevonden: ${JSON.stringify(L)}`); else unitOfVbo[i] = L[0].unit; }
+    // VT15: the taxonomy's own rules reject a unit address with a BAG VBO ID (UnitInformation_PrtExistenceTAxisThnExistence*), so commercial VBOs are not linked
+    if (u === 'c' && tax === 'VT15') { if (L.length) fail(`VT15: VBO ${i + 1} (commercieel) mag niet aan een Ruimte gekoppeld zijn (VT15-regels): ${JSON.stringify(L)}`); }
+    else if (u === 'c') { if (L.length !== 1 || L[0].kind !== 'c') fail(`VBO ${i + 1} (commercieel) moet aan precies 1 Ruimte gekoppeld zijn, gevonden: ${JSON.stringify(L)}`); else unitOfVbo[i] = L[0].unit; }
     if (u === 'a' || u === 'u') { if (L.length) fail(`VBO ${i + 1} (${NAME[u]}) mag niet aan een Eenheid/Ruimte gekoppeld zijn: ${JSON.stringify(L)}`); }
     if (u === 'u' && (links[v] || []).length) fail(`VBO ${i + 1} (unlinked) komt voor in een koppeling: ${JSON.stringify(links[v])}`);
     // commerciële VBO's: BAGVBOID-as in Adres ruimte
-    if (u === 'c' && !X.facts.some(f => hasAxis(X, f, 'UnitAxis') && member(X, f, 'BAGVBOIDAxis') === v)) fail(`VBO ${i + 1}: geen Adres ruimte met BAGVBOID-as`);
+    if (u === 'c' && tax !== 'VT15' && !X.facts.some(f => hasAxis(X, f, 'UnitAxis') && member(X, f, 'BAGVBOIDAxis') === v)) fail(`VBO ${i + 1}: geen Adres ruimte met BAGVBOID-as`);
     if (u !== 'c' && X.facts.some(f => hasAxis(X, f, 'UnitAxis') && member(X, f, 'BAGVBOIDAxis') === v)) fail(`VBO ${i + 1} (${NAME[u]}) heeft een Adres ruimte`);
   });
   // adres van de gekoppelde eenheid = hoofdadres van hetzelfde VBO; plausibele eenheidsgegevens

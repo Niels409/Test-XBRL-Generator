@@ -178,16 +178,9 @@ else:
     ext['r'] = {'facts': r, 'anchor': E['base']['anchor'], 'full': False}
     ext['a'] = {'facts': a, 'anchor': E['base']['anchor'], 'full': False}
 
-# commerciële eenheid zonder adres (VT15-voorbeeld): 'Adres ruimte' toevoegen zodat elk commercieel VBO aan een Ruimte gekoppeld wordt
-ufacts = [f for f in E['base']['facts'] if any(d[0] == 'frc-vt-dim:UnitAxis' for d in f['d']) and not any(d[0] == 'frc-vt-dim:LeaseContractAxis' for d in f['d'])]
-if ufacts and not any(any(d[0] == 'frc-vt-dim:BAGVBOIDAxis' for d in f['d']) for f in ufacts):
-    first = [d for d in ufacts[0]['d'] if d[0] == 'frc-vt-dim:UnitAxis'][0][2]
-    AD = [['frc-vt-dim:BAGVBOIDAxis', 't', 'BAGVBO-1'], ['frc-vt-dim:UnitAxis', 't', first]]
-    for c, v in (('frc-vt-i:LinkedBAGVBOID', 'BAGVBO-1'), ('nl-cd:StreetNameNL', 'Straat'), ('frc-vt-i:StreetNameNLFull', 'Straat'),
-                 ('nl-cd:HouseNumberNL', '1'), ('nl-cd:HouseNumberAddition', 'A'), ('nl-cd:PostalCodeNL', '1000AA'),
-                 ('nl-cd:PlaceOfResidenceNL', 'Plaats'), ('nl-cd:CountryCodeISO', 'NLD')):
-        f = fact(c, AD, v); f['g'] = 'c'; E['base']['facts'].append(f)
-    print('added Adres ruimte template')
+# No 'Adres ruimte' is added when the official example has none (VT15): the VT15 rules require every fact with UnitAxis to have
+# the same dimensions as UnitType, MarketRent, ... (UnitInformation_PrtExistenceTAxisThnExistence*), so a unit address with a
+# BAG VBO ID dimension is always rejected (found by Arelle). In VT15 commercial VBOs are therefore not linked to a Ruimte.
 # huisnummertoevoeging in het adres van residentiële eenheden
 for src in ext.values():
     hs = [f for f in src['facts'] if f.get('g') == 'r' and f['c'] == 'nl-cd:HouseNumberNL' and any(d[0] == 'frc-vt-dim:HouseAxis' for d in f['d'])]
