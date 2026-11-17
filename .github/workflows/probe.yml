@@ -42,19 +42,28 @@ jobs:
           mkdir -p sel && cp gen/07-negative-tests/S7-NEG-0{1,5,9}_Taxatierapport.xbrl gen/07-negative-tests/S7-NEG-19_Taxatierapport.xbrl gen/01-residential-vt17/S1-RES-01_Taxatierapport.xbrl gen/03-mixed-and-unlinked-vt17/S3-MIX-01_Taxatierapport.xbrl sel/
           cp gen/baseline/VT17_Taxatierapport_official-example.xbrl sel/ && cp pkg/vt17-examples/*taxatierapport.xbrl sel/ 2>/dev/null || true
           ls sel
-      - name: Validate a selection with Arelle (diagnostic, info level)
+      - name: Disclosure systems and plugins
         run: |
-          python3 tools/arelle_validate.py --packages pkg/vt17.zip pkg/vt15.zip --out arelle --log-level info --jobs 4 sel || true
+          arelleCmdLine --disclosureSystem help 2>&1 | head -60 || true
+          python3 -c "import arelle, os; p=os.path.join(os.path.dirname(arelle.__file__),'plugin'); print(sorted(os.listdir(p))); print(sorted(os.listdir(os.path.join(p,'validate'))) if os.path.isdir(os.path.join(p,'validate')) else '')"
+      - name: Validate with the SBR-NL disclosure system (diagnostic)
+        run: |
+          cp gen/07-negative-tests/S7-NEG-15_Taxatierapport.xbrl gen/07-negative-tests/S7-NEG-02_Taxatierapport.xbrl sel/
+          for ds in SBR-NL sbr-nl; do
+            echo "== trying $ds"
+            arelleCmdLine --file sel/S7-NEG-01_Taxatierapport.xbrl --validate --disclosureSystem $ds --packages "pkg/vt17.zip|pkg/vt15.zip" --logLevel info --logFile ds_test.txt >/dev/null 2>&1 || true
+            head -c 1500 ds_test.txt; echo; grep -c . ds_test.txt || true
+          done
+          python3 tools/arelle_validate.py --packages pkg/vt17.zip pkg/vt15.zip --out arelle-sbrnl --extra "--disclosureSystem SBR-NL" --jobs 4 sel || true
           python3 - <<'PY'
-          import json, glob
-          for f in sorted(glob.glob('arelle/**/*.log.xml', recursive=True)):
-              import xml.etree.ElementTree as ET
-              es = list(ET.parse(f).getroot().iter('entry'))
-              from collections import Counter
+          import glob, xml.etree.ElementTree as ET
+          from collections import Counter
+          for f in sorted(glob.glob('arelle-sbrnl/**/*.log.xml', recursive=True)):
+              es = [e for e in ET.parse(f).getroot().iter('entry') if (e.get('level') or '') in ('error','warning','inconsistency')]
               c = Counter((e.get('level'), e.get('code')) for e in es)
-              print('=====', f, len(es), 'entries')
-              for (lvl, code), n in c.most_common(25): print(f'   {n:4d} {lvl:8s} {code}')
-              for e in es:
-                  if e.get('code', '').startswith(('formula:assertionResult', 'formula:assertionResultCounts')) or 'Unsatisfied' in (e.get('code') or ''):
-                      m = e.find('message'); print('   >>', e.get('level'), e.get('code'), (m.text or '')[:400]); 
+              print('=====', f, len(es), 'errors/warnings')
+              for (lvl, code), n in c.most_common(30):
+                  ex = next(e for e in es if e.get('code') == code and e.get('level') == lvl)
+                  m = ex.find('message')
+                  print(f'   {n:4d} {lvl:8s} {code}: {(m.text or "")[:260]}')
           PY

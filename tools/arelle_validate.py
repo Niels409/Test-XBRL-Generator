@@ -17,12 +17,17 @@ ap.add_argument('--jobs', type=int, default=os.cpu_count() or 2)
 ap.add_argument('--arelle', default='arelleCmdLine')
 ap.add_argument('--log-level', default='warning')
 ap.add_argument('--extra', default='', help='extra Arelle options, space separated')
+ap.add_argument('--shard', default='1/1', help='i/n: validate only every n-th file starting at i (to spread the work over parallel jobs)')
 ap.add_argument('paths', nargs='+')
 a = ap.parse_args()
 
 files = []
 for p in a.paths:
     files += sorted(glob.glob(os.path.join(p, '**', '*.xbrl'), recursive=True)) if os.path.isdir(p) else [p]
+si, sn = (int(x) for x in a.shard.split('/'))
+files = sorted(files)[si - 1::sn]
+if not files:
+    sys.exit('No files to validate')
 base = os.path.commonpath([os.path.abspath(f) for f in files]) if len(files) > 1 else os.path.dirname(os.path.abspath(files[0]))
 os.makedirs(a.out, exist_ok=True)
 
@@ -44,12 +49,13 @@ def run(f):
     try:
         for e in ET.parse(log).getroot().iter('entry'):
             lvl = (e.get('level') or '').lower()
-            if lvl in IGNORE:
-                continue
+            if lvl in IGNORE or (e.get('code') or '').startswith('message:'):
+                continue  # message:<assertion> repeats the text of formula:assertionUnsatisfied
             m = e.find('message')
             refs = [r.get('href') or '' for r in e.iter('ref')]
             # an error that only points into taxonomy files (not into the instance) is a taxonomy issue, not a problem of the generated file
-            where = 'taxonomy' if refs and not any(os.path.basename(f) in r for r in refs) else 'instance'
+            code = e.get('code') or ''
+            where = 'taxonomy' if refs and not code.startswith(('formula:', 'xbrlfe:', 'xfie:', 'xbrlvarinste:')) and not any(os.path.basename(f) in r for r in refs) else 'instance'
             msgs.append({'level': lvl, 'code': e.get('code') or '', 'message': (m.text if m is not None else '') or '', 'where': where, 'refs': refs[:3]})
     except Exception as ex:  # no log written: treat stdout/stderr as the message
         msgs.append({'level': 'error', 'code': 'arelle:noLog', 'message': f'{ex}; exit {pr.returncode}; {pr.stderr[-500:] or pr.stdout[-500:]}'})
@@ -90,7 +96,7 @@ for rel, r in sorted(res.items()):
 
 summary = {'files': len(res), 'withErrors': sum(1 for r in res.values() if r['errors']), 'unexpected': bad, 'errorCodes': codes, 'taxonomyLevelErrors': taxcodes, 'rows': rows}
 json.dump(summary, open(os.path.join(a.out, 'summary.json'), 'w'), indent=1)
-md = [f"### Arelle validation: {len(res)} files, {summary['withErrors']} with errors, {len(bad)} not as expected", '',
+md = [f"### Arelle validation{'' if sn == 1 else f' (part {si} of {sn})'}: {len(res)} files, {summary['withErrors']} with errors, {len(bad)} not as expected", '',
       '| File | Expected | Arelle | Own check | Errors | First error |', '|---|---|---|---|---|---|']
 for r in rows:
     if not r['match'] or r['errors'] or r['expected'] == 'deviations':
