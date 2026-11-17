@@ -1,0 +1,58 @@
+[
+ {
+  "key": "00-full-regression",
+  "title": "Full regression set",
+  "description": "All valid scenarios of sets 1 to 6 in one file.",
+  "file": "00-full-regression.xlsx",
+  "rows": 47
+ },
+ {
+  "key": "01-residential-vt17",
+  "title": "Residential (VT17)",
+  "description": "Homes: one or more Eenheden, parking space, with and without market values.",
+  "file": "01-residential-vt17.xlsx",
+  "rows": 8
+ },
+ {
+  "key": "02-commercial-vt17",
+  "title": "Commercial (VT17)",
+  "description": "Commercial units (Ruimte) with lease contracts, land, high values.",
+  "file": "02-commercial-vt17.xlsx",
+  "rows": 5
+ },
+ {
+  "key": "03-mixed-and-unlinked-vt17",
+  "title": "Mixed use and unlinked (VT17)",
+  "description": "Combinations of commercial and residential VBOs and unlinked VBOs.",
+  "file": "03-mixed-and-unlinked-vt17.xlsx",
+  "rows": 6
+ },
+ {
+  "key": "04-agricultural-vt17",
+  "title": "Agricultural (VT17)",
+  "description": "Farms, land and combinations with the other uses.",
+  "file": "04-agricultural-vt17.xlsx",
+  "rows": 4
+ },
+ {
+  "key": "05-all-data-products-vt17",
+  "title": "All data products, one case (VT17)",
+  "description": "The six data products for the same case and VBO.",
+  "file": "05-all-data-products-vt17.xlsx",
+  "rows": 6
+ },
+ {
+  "key": "06-vt15",
+  "title": "VT15: residential, commercial, mixed, all data products",
+  "description": "The VT15 counterparts of sets 1, 2, 3 and 5.",
+  "file": "06-vt15.xlsx",
+  "rows": 18
+ },
+ {
+  "key": "07-negative-tests",
+  "title": "Negative tests",
+  "description": "Invalid, missing and contradictory input. Most rows are generated on purpose with deviations; the expected problem is in the Description.",
+  "file": "07-negative-tests.xlsx",
+  "rows": 20
+ }
+]

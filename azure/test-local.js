@@ -14,5 +14,6 @@ const { generateFromXlsx } = require('./lib.js');
     console.log(`${f.valid ? 'OK ' : 'DEV'} ${f.name}  processId=${f.processId}${f.deviations.length ? '  ' + f.deviations[0] : ''}`);
   }
   for (const f of res.failed) console.log(`ERR ${f.test}: ${f.errors.join('; ')}`);
+  if (res.report) fs.writeFileSync(path.join(outDir, res.report.name), Buffer.from(res.report.contentBase64, 'base64'));
   console.log(res.summary);
 })().catch(e => { console.error(e.message || e); process.exit(1); });

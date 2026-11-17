@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'   # every Monday: catches changes in the taxonomies or in Arelle
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: pip install --quiet openpyxl
+      - name: Build template, scenario sets, app and Azure package
+        run: ./build.sh
+      - name: Official SBR Nexus examples against the built-in check
+        run: |
+          node test/base_check.js
+          node test/base_check.js data/appdata-vt15.json
+      - name: Scenario tests (700+)
+        run: node test/deep.js
+      - name: Review tests
+        run: node test/review.js
+      - name: Azure Function (local run)
+        run: cd azure && node test-local.js template.xlsx ../test/out/azure
+      - name: Browser test (headless Chromium)
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+          node test/ui.js
+      - name: Upload the built app
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-xbrl-generator-${{ github.sha }}
+          path: dist/
+          retention-days: 30
+
+  arelle:
+    name: Official validation (Arelle) ${{ matrix.part }}/4
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4]
+    env:
+      # Official SBR Nexus downloads (release bundles with the taxonomy package and the example messages).
+      # Override with repository variables VT17_PACKAGE_URL / VT15_PACKAGE_URL if SBR Nexus moves them.
+      VT17_PACKAGE_URL: ${{ vars.VT17_PACKAGE_URL || 'https://pub-5ff4320167a14f958d5d55262805643c.r2.dev/media/VT17_FRC_20240131_Package_update_20260804.zip' }}
+      VT15_PACKAGE_URL: ${{ vars.VT15_PACKAGE_URL || 'https://pub-5ff4320167a14f958d5d55262805643c.r2.dev/media/VT15.zip' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Arelle
+        run: pip install --quiet arelle-release openpyxl lxml
+      - name: Cache the downloads and the Arelle web cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            dl
+            ~/.config/arelle/cache
+          key: sbr-downloads-v1-${{ env.VT17_PACKAGE_URL }}-${{ env.VT15_PACKAGE_URL }}
+      - name: Get the official taxonomy packages and example messages
+        run: |
+          mkdir -p dl pkg
+          [ -s dl/vt17.zip ] || curl -sSfL "$VT17_PACKAGE_URL" -o dl/vt17.zip
+          [ -s dl/vt15.zip ] || curl -sSfL "$VT15_PACKAGE_URL" -o dl/vt15.zip
+          python3 tools/prepare_package.py dl/vt17.zip pkg/vt17.zip
+          python3 tools/prepare_package.py dl/vt15.zip pkg/vt15.zip
+          sha256sum pkg/*.zip
+      - name: Generate the scenario sets and the official examples
+        run: |
+          python3 build/scenario_sets.py data/appdata-vt17.json sets
+          node tools/generate_from_sets.js sets gen
+          mkdir -p gen/official-examples
+          for t in vt17 vt15; do for f in pkg/$t-examples/*.xbrl; do [ -e "$f" ] && cp "$f" "gen/official-examples/${t}_$(basename "$f")"; done; done
+          find gen -name '*.xbrl' | wc -l
+      - name: Independent check against the taxonomy XSDs
+        if: matrix.part == 1
+        run: |
+          mkdir -p x17 x15 && unzip -q pkg/vt17.zip -d x17 && unzip -q pkg/vt15.zip -d x15
+          python3 test/xsd_check.py gen "$(ls -d x17/*/)" "$(ls -d x15/*/)"
+      - name: Validate with Arelle (part ${{ matrix.part }} of 4)
+        run: python3 tools/arelle_validate.py --packages pkg/vt17.zip pkg/vt15.zip --out arelle --expected gen/expected.json --jobs 4 --shard ${{ matrix.part }}/4 gen
+      - name: Summary
+        if: always()
+        run: '[ -f arelle/summary.md ] && cat arelle/summary.md >> "$GITHUB_STEP_SUMMARY" || true'
+      - name: Upload the Arelle results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arelle-results-part${{ matrix.part }}-${{ github.sha }}
+          path: arelle/
+          retention-days: 30

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VT17 Test Generator</title>
+<title>Test XBRL Generator</title>
 <style>
 :root{
   --navy:#17324D; --navy-2:#21456A; --paper:#EEF2EF; --card:#FFFFFF; --ink:#17324D; --ink-2:#506579; --line:#CCD6D1;
@@ -99,6 +99,16 @@ main{position:relative;max-width:1180px;margin:-118px auto 0;padding:0 24px 40px
 .flist .got{font-size:12.5px;color:var(--ok);font-weight:600}
 @media (max-width:600px){.files{padding:18px 16px}.flist li{grid-template-columns:auto 1fr}.flist li .btn{grid-column:2;justify-self:start}}
 
+/* scenariobibliotheek */
+.lib{margin:16px 0 0;padding:14px 0 0;border-top:1px solid #E2E8E5;font-size:14px}
+.lib label{display:block;margin-bottom:6px;color:var(--ink);font-weight:600}
+.lib select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
+.lib select:focus{outline:2px solid var(--act);outline-offset:1px}
+.setdesc{margin:6px 0 10px;color:var(--ink-2);font-size:13.5px;min-height:2.6em}
+.libbtns{display:flex;gap:8px;flex-wrap:wrap}
+.flist .expbad{display:inline-block;margin-top:3px;font-size:12.5px;font-weight:700;color:var(--bad)}
+.flist .expok{display:inline-block;margin-top:3px;font-size:12.5px;color:var(--ok)}
+.files .actions{display:flex;gap:8px;flex-wrap:wrap}
 footer{max-width:1180px;margin:0 auto;padding:0 24px 28px;font-size:13px;color:var(--ink-2)}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:6px;font-size:15px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
@@ -125,7 +135,7 @@ footer{max-width:1180px;margin:0 auto;padding:0 24px 28px;font-size:13px;color:v
     </g>
   </svg>
   <div class="in">
-    <h1>VT17 Test Generator</h1>
+    <h1>Test XBRL Generator</h1>
     <p>From Excel test scenarios to test XBRL files based on the Dutch real estate taxonomy (VT17 or VT15, chosen per row). Anything you leave out is filled in with realistic data.</p>
   </div>
 </header>
@@ -140,6 +150,15 @@ footer{max-width:1180px;margin:0 auto;padding:0 24px 28px;font-size:13px;color:v
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg>
           Download template
         </button>
+        <div class="lib">
+          <label for="setSel">Or start from a ready-made scenario set</label>
+          <select id="setSel"></select>
+          <p class="setdesc" id="setDesc"></p>
+          <div class="libbtns">
+            <button class="btn solid" id="btnSetLoad" type="button">Load in step 2</button>
+            <button class="btn" id="btnSetXlsx" type="button">Download as Excel</button>
+          </div>
+        </div>
         <div class="cols">
           <b>Per test you fill in</b>
           <ul>
@@ -149,6 +168,7 @@ footer{max-width:1180px;margin:0 auto;padding:0 24px 28px;font-size:13px;color:v
             <li>Address of the property</li>
             <li>One or more VBO IDs, each with its use and market value</li>
             <li>Valuation date and the valuer's CoC number</li>
+            <li>Optional: a description and the expected result (in the test report)</li>
           </ul>
           <p style="margin:8px 0 0">The rest of the XBRL is filled with realistic data.</p>
         </div>
@@ -186,12 +206,18 @@ footer{max-width:1180px;margin:0 auto;padding:0 24px 28px;font-size:13px;color:v
     <div class="fhead">
       <h2 id="hf">Generated XBRL files</h2>
       <span class="meta" id="filesMeta"></span>
-      <button class="btn solid" id="btnAll" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg>
-        Download all again
-      </button>
+      <div class="actions">
+        <button class="btn solid" id="btnReport" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M7 3h7l5 5v13H7z M14 3v5h5 M10 13h6 M10 17h6"/></svg>
+          Download test report
+        </button>
+        <button class="btn" id="btnAll" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16"/></svg>
+          Download all again
+        </button>
+      </div>
     </div>
-    <p class="note" style="margin:0">Click a file to download it again. This list stays until you generate new XBRL files.</p>
+    <p class="note" style="margin:0">Click a file to download it again. The test report (Excel) lists every test with its input, result and deviations. This list stays until you generate new XBRL files.</p>
     <ul class="flist" id="fileList"></ul>
   </section>
 </main>
@@ -200,6 +226,7 @@ footer{max-width:1180px;margin:0 auto;padding:0 24px 28px;font-size:13px;color:v
 
 <script type="application/json" id="appdata">/*__APPDATA__*/</script>
 <script type="application/json" id="appdata15">/*__APPDATA15__*/</script>
+<script type="application/json" id="sets">/*__SETS__*/</script>
 <script>/*__CORE__*/</script>
 <script>/*__XLSX__*/</script>
 <script>
@@ -212,9 +239,11 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const GEN_LABEL = 'Generate and download XBRL files';
-  let scenarios = [], generated = [], overviewCsv = '';
+  let scenarios = [], loadedName = '', lastReport = null;
+  const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const b64bytes = (b64) => { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
 
-  $('ver').textContent = 'Taxonomies: Vastgoedtaxonomie ' + APP.version + ' and ' + APP15.version + ' · data products: ' + Object.keys(APP.eps).join(', ');
+  $('ver').textContent = `${VT17Core.APP_NAME} v${VT17Core.VERSION} · taxonomies: Vastgoedtaxonomie ${APP.version} and ${APP15.version} · data products: ${Object.keys(APP.eps).join(', ')}`;
 
   function toast(msg, ms) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), ms || 2600); }
   function download(blob, name) {
@@ -222,8 +251,6 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   }
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
-  const safe = (s) => String(s || '').replace(/[^\w.\-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60);
-  const fileName = (sc, r) => [safe(sc.id), r.tax === 'VT15' ? 'VT15' : '', safe(r.ep || sc.dataproduct)].filter(Boolean).join('_') + '.xbrl';
   const plural = (n, one, more) => n + ' ' + (n === 1 ? one : more);
   const xbrlBlob = (xml) => new Blob([xml], { type: 'application/xml' });
 
@@ -241,7 +268,6 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
   }
 
   function resetStep3(msg) {
-    generated = []; overviewCsv = '';
     $('s3').classList.remove('done');
     $('btnGenLabel').textContent = GEN_LABEL;
     $('result').innerHTML = `<div class="placeholder">${esc(msg)}</div>`;
@@ -256,9 +282,11 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
     const t = new Date();
     $('filesMeta').textContent = `${plural(ok, 'file', 'files')} · generated at ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}` + (items.length > ok ? ` · ${items.length - ok} not generated` : '');
     $('btnAll').hidden = ok < 2;
+    $('btnReport').hidden = !lastReport;
     $('fileList').innerHTML = items.map((x, i) => {
       const sub = [x.id !== x.caseId && x.caseId ? 'Case ' + x.caseId : '', x.ep, x.tax, x.desc].filter(Boolean).map(esc).join(' · ');
-      const msg = x.cls === 'd-warn' ? `<span class="warnmsg">${esc(x.msg)}</span>` : x.cls === 'd-bad' ? `<span class="badmsg">Not generated: ${esc(x.msg)}</span>` : '';
+      const msg = (x.cls === 'd-warn' ? `<span class="warnmsg">${esc(x.msg)}</span>` : x.cls === 'd-bad' ? `<span class="badmsg">Not generated: ${esc(x.msg)}</span>` : '') +
+        (x.expected ? (x.asExpected ? `<span class="expok">As expected (${esc(x.expected)})</span>` : `<span class="expbad">Not as expected: expected ${esc(x.expected)}</span>`) : '');
       return x.xml
         ? `<li class="clickable" data-i="${i}" title="Download again"><span class="dot ${x.cls}"></span><div><span class="fn">${esc(x.name)}</span><span class="sub">${sub}</span>${msg}</div><button class="btn" type="button" data-i="${i}">${DL_ICON}Download</button></li>`
         : `<li><span class="dot d-bad"></span><div><span class="fn">${esc(x.id)}</span><span class="sub">${sub}</span>${msg}</div></li>`;
@@ -271,6 +299,12 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
     download(xbrlBlob(x.xml), x.name);
     toast(x.name + ' downloaded');
   };
+  $('btnReport').onclick = async () => {
+    if (!lastReport) return;
+    const blob = VT17Xlsx.writeXlsx(lastReport.sheets);
+    download(new Blob([blob], { type: XLSX_MIME }), `Test report ${lastReport.stamp.replace(':', '')}.xlsx`);
+    toast('Test report downloaded');
+  };
   $('btnAll').onclick = async () => {
     const list = lastFiles.filter(x => x.xml);
     for (let i = 0; i < list.length; i++) { download(xbrlBlob(list[i].xml), list[i].name); if (i < list.length - 1) await wait(400); }
@@ -281,10 +315,20 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
   $('btnTemplate').onclick = () => {
     const bin = atob(TEMPLATE_B64); const u = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-    download(new Blob([u], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'VT17 test scenarios template.xlsx');
+    download(new Blob([u], { type: XLSX_MIME }), 'Test XBRL Generator - template.xlsx');
     $('s1').classList.add('done');
     toast('Template downloaded');
   };
+
+  // scenariobibliotheek: kant-en-klare sets, direct laden of als Excel downloaden
+  const SETS = JSON.parse(document.getElementById('sets').textContent || '[]');
+  $('setSel').innerHTML = SETS.map((st, i) => `<option value="${i}">${esc(st.title)} (${st.rows} tests)</option>`).join('');
+  const setDesc = () => { const st = SETS[+$('setSel').value]; $('setDesc').textContent = st ? st.description : ''; };
+  $('setSel').onchange = setDesc; setDesc();
+  if (!SETS.length) $('setSel').closest('.lib').hidden = true;
+  const setFile = () => { const st = SETS[+$('setSel').value]; return st && new File([b64bytes(st.b64)], `Scenario set - ${st.title}.xlsx`, { type: XLSX_MIME }); };
+  $('btnSetLoad').onclick = () => { const f = setFile(); if (f) { load(f); $('s1').classList.add('done'); } };
+  $('btnSetXlsx').onclick = () => { const f = setFile(); if (f) { download(f, f.name); $('s1').classList.add('done'); toast('Scenario set downloaded'); } };
 
   // ---------------------------------------------------------------- step 2
   const drop = $('drop');
@@ -301,7 +345,7 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
       const rows = await VT17Xlsx.readFirstSheet(await file.arrayBuffer());
       const list = VT17Xlsx.rowsToScenarios(rows);
       if (!list.length) throw new Error('No tests found. Fill in at least the Data product.');
-      scenarios = list;
+      scenarios = list; loadedName = file.name || '';
       const per = {};
       for (const sc of list) { const ep = model.VT17.resolveEp(sc.dataproduct) || (sc.dataproduct || 'unknown data product'); per[ep] = (per[ep] || 0) + 1; }
       drop.classList.add('loaded');
@@ -320,43 +364,35 @@ const TEMPLATE_B64 = "/*__TEMPLATE__*/";
   $('btnGen').onclick = async () => {
     $('btnGen').disabled = true;
     $('btnGenLabel').textContent = 'Generating…';
-    const today = VT17Core.todayUTC();
-    const rows = [['Test ID', 'Scenario description', 'Data product', 'Case ID', 'Taxonomy', 'VBO IDs', 'VBO uses', 'File', 'Generated', 'Taxonomy deviations', 'Warnings', 'Applied', 'Messages']];
-    generated = [];
-    const items = [];
-    let valid = 0, dev = 0, failed = 0;
-    for (const sc of scenarios) {
-      let r;
-      try { r = VT17Core.generate(model, sc, { today }); }
-      catch (e) { r = { ok: false, errors: ['Unexpected error: ' + (e.message || e)], warnings: [], log: [] }; }
-      const name = r.ok && r.xml ? fileName(sc, r) : '';
-      if (name) {
-        generated.push({ name, xml: r.xml });
-        const n = r.validation.errors.length;
-        const base = { name, id: sc.id, xml: r.xml, ep: r.ep, tax: r.tax, caseId: sc.caseId, desc: sc.omschrijving };
-        if (n) { dev++; items.push(Object.assign(base, { cls: 'd-warn', msg: `${plural(n, 'deviation', 'deviations')} from ${r.tax}: ${r.validation.errors[0]}` })); }
-        else { valid++; items.push(Object.assign(base, { cls: 'd-ok', msg: '' })); }
-      } else { failed++; items.push({ cls: 'd-bad', name: '', id: sc.id, ep: r.ep || sc.dataproduct, tax: r.tax || sc.taxonomy, caseId: sc.caseId, msg: r.errors[0] || 'Not generated' }); }
-      rows.push([sc.id, sc.omschrijving, r.ep || sc.dataproduct, sc.caseId, r.tax || sc.taxonomy || '', (r.vbos || sc.vbos || []).join(' '), (sc.vboUses || []).join(' '), name, name ? 'yes' : 'no',
-        r.validation ? r.validation.errors.length : '', (r.warnings || []).length + (r.validation ? r.validation.warnings.length : 0),
-        (r.log || []).join(' | '), [...(r.errors || []), ...(r.validation ? r.validation.errors : []), ...(r.warnings || []), ...(r.validation ? r.validation.info : [])].join(' | ')]);
-    }
-    overviewCsv = '﻿' + rows.map(r => r.map(c => { const s = String(c == null ? '' : c); return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\r\n');
-
-    const ok = generated.length;
+    await wait(30);
+    const batch = VT17Core.runBatch(model, scenarios, { today: VT17Core.todayUTC(), source: loadedName });
+    lastReport = batch.report;
+    const EXP = { 'no deviations': 'ok', 'deviations': 'deviations', 'not generated': 'failed' };
+    const items = batch.items.map(({ sc, r, name, status }) => {
+      const exp = String(sc.verwacht || '').trim();
+      const base = { id: sc.id, ep: r.ep || sc.dataproduct, tax: r.tax || sc.taxonomy, caseId: sc.caseId, desc: sc.omschrijving,
+        expected: exp, asExpected: exp ? EXP[exp.toLowerCase()] === status : true };
+      if (status === 'failed') return Object.assign(base, { cls: 'd-bad', name: '', msg: (r.errors || [])[0] || 'Not generated' });
+      const n = r.validation.errors.length;
+      return Object.assign(base, { name, xml: r.xml, cls: n ? 'd-warn' : 'd-ok', msg: n ? `${plural(n, 'deviation', 'deviations')} from ${r.tax}: ${r.validation.errors[0]}` : '' });
+    });
+    const files = items.filter(x => x.xml);
 
     // lijst direct tonen, daarna de XBRL-bestanden los downloaden, kort na elkaar
     showFiles(items);
-    for (let i = 0; i < generated.length; i++) {
-      download(xbrlBlob(generated[i].xml), generated[i].name);
-      if (i < generated.length - 1) await wait(400);
+    for (let i = 0; i < files.length; i++) {
+      download(xbrlBlob(files[i].xml), files[i].name);
+      if (i < files.length - 1) await wait(400);
     }
     // melding, daarna terug naar de beginstand
     const bad = items.filter(x => x.cls === 'd-bad').map(x => x.id);
-    let msg = ok === 1 ? '1 XBRL file saved to Downloads' : `${ok} XBRL files saved to Downloads`;
+    const dev = items.filter(x => x.cls === 'd-warn').length;
+    const mism = items.filter(x => !x.asExpected).length;
+    let msg = files.length === 1 ? '1 XBRL file saved to Downloads' : `${files.length} XBRL files saved to Downloads`;
     if (bad.length) msg += ` · not generated: ${bad.join(', ')}`;
     if (dev) msg += ` · ${dev} with taxonomy deviations`;
-    toast(msg, bad.length || dev ? 7000 : 3000);
+    if (mism) msg += ` · ${mism} not as expected`;
+    toast(msg, bad.length || dev || mism ? 7000 : 3000);
     resetAll();
   };
 })();

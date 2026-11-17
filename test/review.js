@@ -19,7 +19,7 @@ const TAXES = ['VT17', 'VT15'];
 const USESETS = { VT17: [['Residential'], ['Commercial'], ['Commercial', 'Residential'], ['Agricultural'], ['Residential', 'Residential', 'Unlinked']], VT15: [['Residential'], ['Commercial'], ['Commercial', 'Residential'], ['Residential', 'Residential', 'Unlinked']] };
 
 // =================================================================== A. inhoudelijke consistentie
-section = 'A. Inhoudelijke consistentie';
+section = 'A. Content consistency';
 for (const tax of TAXES) for (const us of USESETS[tax]) for (const withVals of [true, false]) {
   const label = `${tax} ${us.join('+')} ${withVals ? 'met' : 'zonder'} marktwaarden`;
   const sc = { taxonomy: tax, vbos: us.map((_, i) => V(i)), vboUses: us, vboValues: us.map((_, i) => withVals ? 300000 + i * 50000 : ''), fixed: { waardepeildatum: '02-11-2026' } };
@@ -85,7 +85,7 @@ for (const tax of TAXES) for (const us of USESETS[tax]) for (const withVals of [
 }
 
 // =================================================================== B. validator zelftest (mutaties)
-section = 'B. Zelftest van de controle (ingebouwde fouten moeten gevonden worden)';
+section = 'B. Self-test of the built-in check (injected errors must be found)';
 for (const tax of TAXES) {
   const r = gen({ taxonomy: tax, vbos: [V(0), V(1)], vboUses: ['Commercial', 'Residential'], vboValues: [900000, 350000] });
   const base = () => r.facts.map(f => ({ c: f.c, d: f.d.map(x => x.slice()), v: f.v, u: f.u ? f.u.slice() : null, dec: f.dec }));
@@ -114,7 +114,7 @@ for (const tax of TAXES) {
 }
 
 // =================================================================== C. negatieve tests: EMPTY / REMOVE per veld
-section = 'C. Velden weglaten (EMPTY) en ongeldige invoer';
+section = 'C. Leaving fields out (EMPTY) and invalid input';
 const FIELD_CONCEPT = { valuerReportId: ['Reference', 'ContractorMember'], valuerKvk: ['ChamberOfCommerceRegistrationNumber', 'ContractorMember'], useType: ['ScopeValuation', null], postcode: ['PostalCodeNL', 'VBO'], straat: ['StreetNameNL', 'VBO'], huisnummer: ['HouseNumberNL', 'VBO'], waardepeildatum: ['ValuationDate', null] };
 for (const tax of TAXES) for (const [field, [concept, where]] of Object.entries(FIELD_CONCEPT)) for (const marker of ['EMPTY', 'leeg']) {
   T(`${tax} ${field} = ${marker}`, (fail) => {
@@ -131,7 +131,7 @@ T('VBO ID = EMPTY', (fail) => { const r = gen({ vbos: ['EMPTY'], vboUses: ['Resi
 T('Marktwaarde VBO = EMPTY', (fail) => { const r = gen({ vbos: [V(0)], vboUses: ['Residential'], vboValues: ['EMPTY'] }); const X = parseX(r.xml); if (X.facts.some(f => f.v === 'EMPTY')) fail('letterlijke tekst EMPTY als marktwaarde'); if (r.validation.errors.length) fail(r.validation.errors[0]); });
 
 // =================================================================== D. structuur t.o.v. officieel voorbeeld
-section = 'D. Structuur ten opzichte van de officiële voorbeelden';
+section = 'D. Structure compared with the official examples';
 for (const tax of TAXES) for (const ep of M[tax].dataproducts()) {
   T(`${tax} ${ep}: geen velden kwijtgeraakt t.o.v. officieel voorbeeld`, (fail) => {
     const E = M[tax].APP.eps[ep];
@@ -149,7 +149,7 @@ for (const tax of TAXES) for (const ep of M[tax].dataproducts()) {
 }
 
 // =================================================================== E. determinisme en uniciteit
-section = 'E. Herhaalbaarheid en uniciteit';
+section = 'E. Repeatability and uniqueness';
 T('Zelfde regel twee keer → identieke XBRL', (fail) => { const sc = { vbos: [V(0)], vboUses: ['Residential'], vboValues: [300000] }; if (gen(sc).xml !== gen(sc).xml) fail('uitvoer verschilt tussen twee runs'); });
 T('Zonder VBO: Process ID 12 cijfers, begint met 2000000', (fail) => { for (let i = 0; i < 50; i++) { const r = gen({ caseId: 'P' + i }); if (!/^2000000\d{5}$/.test(r.procesId)) return fail(`Process ID ${r.procesId}`); } });
 T('50 regels → verschillende vuldata per rapport', (fail) => {
@@ -170,9 +170,10 @@ let pass = 0, failN = 0;
 const bySec = {};
 for (const r of results) { const s = bySec[r.section] = bySec[r.section] || { pass: 0, fail: [] }; if (r.errs.length) { s.fail.push(r); failN++; } else { s.pass++; pass++; } }
 for (const [s, o] of Object.entries(bySec)) {
-  console.log(`\n${s}: ${o.pass} geslaagd, ${o.fail.length} gefaald`);
+  console.log(`\n${s}: ${o.pass} passed, ${o.fail.length} failed`);
   const grouped = {};
   for (const f of o.fail) for (const e of [...new Set(f.errs)]) { const k = e.replace(/\d{5,}/g, 'N').replace(/\d+/g, 'n'); (grouped[k] = grouped[k] || []).push([f.name, e]); }
   for (const list of Object.values(grouped)) console.log(`  ✗ (${list.length}×) ${list[0][1].slice(0, 230)}   ← ${list[0][0]}`);
 }
-console.log(`\nTOTAAL ${pass + failN}: ${pass} geslaagd, ${failN} gefaald`);
+console.log(`\nTOTAL ${pass + failN}: ${pass} passed, ${failN} failed`);
+process.exitCode = failN ? 1 : 0;

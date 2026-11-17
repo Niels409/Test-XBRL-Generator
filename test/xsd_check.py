@@ -20,11 +20,11 @@ def load(pkg, ver, date):
 T={'vt17':load(sys.argv[2],'vt17','20240131'),'vt15':load(sys.argv[3],'vt15','20210421')}
 XI='{http://www.xbrl.org/2003/instance}'; XDI='{http://xbrl.org/2006/xbrldi}'
 tot=0; files=0; kinds={}
-for fn in sorted(glob.glob(sys.argv[1]+'/*.xbrl')):
+for fn in sorted(glob.glob(os.path.join(sys.argv[1], '**', '*.xbrl'), recursive=True)):
     files+=1; probs=[]
     try: root=etree.parse(fn).getroot()
     except Exception as e:
-        probs.append('XML niet well-formed: '+str(e)[:100]); root=None
+        probs.append('XML not well-formed: '+str(e)[:100]); root=None
     if root is not None:
         href=root.find('{http://www.xbrl.org/2003/linkbase}schemaRef').get('{http://www.w3.org/1999/xlink}href')
         ver='vt17' if '/vt17/' in href else 'vt15'
@@ -35,35 +35,36 @@ for fn in sorted(glob.glob(sys.argv[1]+'/*.xbrl')):
             per=c.find(XI+'period'); kind='instant' if per.find(XI+'instant') is not None else 'duration'
             if kind=='duration':
                 s=per.find(XI+'startDate').text; e=per.find(XI+'endDate').text
-                if s>e: probs.append(f'context {c.get("id")}: start {s} > eind {e}')
+                if s>e: probs.append(f'context {c.get("id")}: start {s} > end {e}')
             ctx[c.get('id')]=kind
             for tm in c.iter(XDI+'typedMember'):
                 p,l=tm.get('dimension').split(':'); ns=root.nsmap[p]
                 want=typed.get((ns,l))
-                if not want: probs.append(f'typed dimensie {l} bestaat niet in {ver}'); continue
+                if not want: probs.append(f'typed dimension {l} does not exist in {ver}'); continue
                 ch=tm[0]; q=etree.QName(ch)
-                if dom[want][0]!=q.namespace or dom[want][1]!=q.localname: probs.append(f'typed member element {q.localname} ≠ {dom[want][1]} voor {l}')
+                if dom[want][0]!=q.namespace or dom[want][1]!=q.localname: probs.append(f'typed member element {q.localname} ≠ {dom[want][1]} for {l}')
                 v=ch.text or ''
-                if 'string255' in (dom[want][2] or '') and len(v)>255: probs.append(f'typed member {l} langer dan 255 tekens')
-                if v.strip()=='' : probs.append(f'typed member {l} leeg')
+                if 'string255' in (dom[want][2] or '') and len(v)>255: probs.append(f'typed member {l} longer than 255 characters')
+                if v.strip()=='' : probs.append(f'typed member {l} empty')
             for em in c.iter(XDI+'explicitMember'):
                 p,l=em.get('dimension').split(':')
-                if (root.nsmap[p],l) not in con: probs.append(f'dimensie {l} bestaat niet')
+                if (root.nsmap[p],l) not in con: probs.append(f'dimension {l} does not exist')
                 mp,ml=em.text.split(':')
-                if (root.nsmap[mp],ml) not in con: probs.append(f'member {ml} bestaat niet')
+                if (root.nsmap[mp],ml) not in con: probs.append(f'member {ml} does not exist')
         for e in root:
             q=etree.QName(e)
             if q.namespace in ('http://www.xbrl.org/2003/instance','http://www.xbrl.org/2003/linkbase'): continue
             k=(q.namespace,q.localname)
             if 'nltaxonomie.nl' in q.namespace:
                 want='nt17' if ver=='vt17' else 'nt15'
-                if '/'+want+'/' not in q.namespace: probs.append(f'{q.localname}: namespace {q.namespace} hoort niet bij {ver}')
+                if '/'+want+'/' not in q.namespace: probs.append(f'{q.localname}: namespace {q.namespace} does not belong to {ver}')
                 continue
             c=con.get(k)
-            if not c: probs.append(f'{q.localname}: bestaat niet in de {ver}-XSD'); continue
-            if c['abstract']: probs.append(f'{q.localname}: abstract concept gerapporteerd')
-            if c['period'] and ctx.get(e.get('contextRef'))!=c['period']: probs.append(f'{q.localname}: periodetype {ctx.get(e.get("contextRef"))} ≠ {c["period"]}')
+            if not c: probs.append(f'{q.localname}: does not exist in the {ver} XSD'); continue
+            if c['abstract']: probs.append(f'{q.localname}: abstract concept reported')
+            if c['period'] and ctx.get(e.get('contextRef'))!=c['period']: probs.append(f'{q.localname}: period type {ctx.get(e.get("contextRef"))} ≠ {c["period"]}')
     for p in probs: kinds[re.sub(r'\d+','n',p)[:90]]=kinds.get(re.sub(r'\d+','n',p)[:90],0)+1
     tot+=len(probs)
-print(f'{files} bestanden gecontroleerd, {tot} problemen')
+print(f'{files} files checked, {tot} problems')
 for k,v in sorted(kinds.items(),key=lambda x:-x[1])[:15]: print(f'  {v}×  {k}')
+sys.exit(1 if tot else 0)

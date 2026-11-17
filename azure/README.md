@@ -1,12 +1,12 @@
-# VT17 test generator — Azure Function
+# Test XBRL Generator — Azure Function
 
-Server-side version of the VT17 Test Generator desktop app. Same generator code (`core.js`, `xlsx.js`, `appdata.json`, `appdata-vt15.json`); generates VT17 or VT15 per row (column Taxonomy), wrapped as an HTTP API for a Copilot Studio agent flow.
+Server-side version of the Test XBRL Generator desktop app. Same generator code (`core.js`, `xlsx.js`, `appdata.json`, `appdata-vt15.json`); generates VT17 or VT15 per row (column Taxonomy), wrapped as an HTTP API for a Copilot Studio agent flow.
 
 ## Endpoints
 
 | Method | Route | Body | Response |
 |---|---|---|---|
-| POST | `/api/generate` | `{ "fileName": "tests.xlsx", "contentBase64": "<xlsx as base64>" }` | `{ summary, files: [{ name, taxonomy, contentBase64, valid, deviations[], warnings[], dataProduct, caseId, processId }], failed: [{ test, row, errors[] }] }` |
+| POST | `/api/generate` | `{ "fileName": "tests.xlsx", "contentBase64": "<xlsx as base64>" }` | `{ generator, summary, files: [{ name, contentBase64, valid, deviations[], warnings[], dataProduct, caseId, processId, expected }], failed: [{ test, row, errors[] }], report: { name, contentBase64 } }` (report = test report .xlsx) |
 | GET | `/api/template` | – | `{ name, contentBase64 }` (Excel template) |
 
 At most 250 tests per call (app setting `MAX_ROWS`); more returns HTTP 413.

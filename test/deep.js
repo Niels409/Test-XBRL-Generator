@@ -401,5 +401,6 @@ for (const t of T) {
   }
   if (errs.length) { failN++; failures.push([t.name, errs]); } else pass++;
 }
-console.log(`\n${pass + failN} tests: ${pass} geslaagd, ${failN} gefaald\n`);
+console.log(`\n${pass + failN} tests: ${pass} passed, ${failN} failed\n`);
 for (const [n, e] of failures) { console.log('✗ ' + n); [...new Set(e)].slice(0, 8).forEach(x => console.log('    - ' + x)); }
+process.exitCode = failN ? 1 : 0;
