@@ -149,7 +149,14 @@ def messages(path):
     return out
 
 
-def parse_filter(el, arcs, res, complement=False):
+def parse_filter(el, arcs, res, complement=False, cover=True):
+    f = _parse_filter(el, arcs, res, complement)
+    if not cover:
+        f['nc'] = True  # the filter does not cover its aspect (cover="false" on the arc)
+    return f
+
+
+def _parse_filter(el, arcs, res, complement=False):
     k = ln(el)
     if k == 'conceptName':
         return {'t': 'c', 'q': [x.text.strip() for x in el.iter(CF + 'qname')], 'not': complement}
@@ -174,7 +181,7 @@ def parse_filter(el, arcs, res, complement=False):
         subs = []
         for a in arcs:
             if a['from'] == el.get(XL + 'label') and a['to'] in res:
-                subs.append(parse_filter(res[a['to']], arcs, res, a.get('complement') == 'true'))
+                subs.append(parse_filter(res[a['to']], arcs, res, a.get('complement') == 'true', a.get('cover') != 'false'))
         if any(s['t'] == 'x' for s in subs):
             return {'t': 'x', 'why': 'unsupported filter inside orFilter'}
         return {'t': 'or', 'f': subs, 'not': complement}
@@ -196,6 +203,10 @@ def parse_filter(el, arcs, res, complement=False):
             sys.exit(f'{el.get("id")}: record the base of {", ".join(unknown)} in NT_BASES')
         q = sorted(c for c, t in ctype.items() if (t == target if strict else derives(t, target)))
         return {'t': 'c', 'q': q, 'not': complement, 'type': target}
+    if k == 'conceptSubstitutionGroup':
+        sg = clark(el.findtext(CF + 'substitutionGroup/' + CF + 'qname'), el)
+        if sg == XBRLI + 'item' and el.get('strict') != 'true':
+            return {'t': 'any', 'not': complement}  # every item fact
     return {'t': 'x', 'why': k}
 
 
@@ -256,6 +267,9 @@ for p in sorted(glob.glob(os.path.join(VAL, '*-for.xml'))):
             sys.exit(f'duplicate assertion id {short}')
         ids.add(short)
         rule = {'id': short, 'msg': msgs.get(rid, ''), 'set': [], 'vars': {}}
+        if el.get('implicitFiltering') != 'true' or el.get('aspectModel') != 'dimensional':
+            unsupported.append(f'{rid}: implicitFiltering={el.get("implicitFiltering")} aspectModel={el.get("aspectModel")}')
+            continue
         pres = []
         for a in arcs:
             if a['from'] != lab or a['to'] not in res:
@@ -265,8 +279,12 @@ for p in sorted(glob.glob(os.path.join(VAL, '*-for.xml'))):
                 fs = []
                 for b in arcs:
                     if b['from'] == a['to'] and b['arcrole'] == 'variable-filter' and b['to'] in res:
-                        fs.append(parse_filter(res[b['to']], arcs, res, b.get('complement') == 'true'))
-                rule['vars'][a['name']] = {'fb': tgt.get('fallbackValue') is not None, 'seq': tgt.get('bindAsSequence') == 'true', 'f': var_filters(fs)}
+                        fs.append(parse_filter(res[b['to']], arcs, res, b.get('complement') == 'true', b.get('cover') != 'false'))
+                fbv = tgt.get('fallbackValue')
+                if fbv is not None and fbv.strip() != '()':
+                    fs.append({'t': 'x', 'why': f'fallback value {fbv}'})
+                # o: evaluation order (Arelle binds the variables in the order of their arcs)
+                rule['vars'][a['name']] = {'fb': fbv is not None, 'seq': tgt.get('bindAsSequence') == 'true', 'o': float(a.get('order', '1')), 'f': var_filters(fs)}
             elif a['arcrole'] == 'variable-set' and ln(tgt) != 'factVariable':
                 rule['vars'][a['name']] = {'f': [{'t': 'x', 'why': ln(tgt)}], 'fb': False, 'seq': False}
             elif a['arcrole'] == 'variable-set-filter':

@@ -947,18 +947,110 @@
         case 'e': { const v = dimVal(f, flt.a); ok = v !== null && (!flt.m.length || flt.m.indexOf(v) >= 0); break; }
         case 't': ok = f.d.some(y => y[0] === flt.a && y[1] === 't'); break;
         case 'or': ok = flt.f.some(x => match(f, x)); break;
+        case 'any': ok = true; break; // every item
         default: return true; // aspectCover e.d.
       }
       return flt.not ? !ok : ok;
     }
+    // aspects covered by a variable's own filters (filters on the variable set never cover; nc = cover="false" on the arc)
     function covered(v) {
-      const cov = { concept: false, period: false, unit: false, all: false, axes: new Set() };
-      for (const flt of v.f) { // groepsfilters (variable-set) dekken geen aspecten af; dat sluit aan bij de officiële voorbeeldberichten
-        if (flt.t === 'c' || (flt.t === 'or' && flt.f.some(x => x.t === 'c'))) cov.concept = true;
-        if (flt.t === 'e' || flt.t === 't') cov.axes.add(flt.a);
-        if (flt.t === 'cov') for (const a of flt.asp) cov[a] = true;
-      }
+      const cov = { concept: false, period: false, unit: false, all: false, dimensions: false, axes: new Set() };
+      const add = (flt) => {
+        if (flt.nc) return;
+        if (flt.t === 'c' || flt.t === 'any') cov.concept = true;
+        else if (flt.t === 'e' || flt.t === 't') cov.axes.add(flt.a);
+        else if (flt.t === 'or') flt.f.forEach(add);
+        else if (flt.t === 'cov') for (const a of flt.asp) { cov[a] = true; if (a === 'all') cov.concept = cov.period = cov.unit = cov.dimensions = true; }
+      };
+      v.f.forEach(add);
       return cov;
+    }
+    const aspectVal = (f, a) => a === 'concept' ? f.c : a === 'period' ? P(f) : a === 'unit' ? (f.u || []).join('*') : dimVal(f, a.slice(4));
+    const universe = [...new Set(facts.flatMap(f => f.d.map(x => 'dim:' + x[0])))];
+    const STD = ['concept', 'period', 'unit']; // entity and location are the same for every fact of a report
+
+    /* The evaluations of a value assertion, the way Arelle (XBRL Formula 1.0, implicit filtering) produces them:
+     *  - the variables are bound in the order of their arcs;
+     *  - a variable only matches facts that have, for every aspect it does not cover itself, the same value as the fact that
+     *    first supplied that aspect among the variables bound before it; it matches nothing at all when its facts use a
+     *    dimension that no variable before it knows (Arelle's implicit filter);
+     *  - a bindAsSequence variable binds groups of facts with the same uncovered aspects, duplicates split over groups;
+     *  - a fallback value (always the empty sequence in VT15/VT17) is only used when no facts bind for the same other bindings.
+     * Returns [{ <variable name>: [facts] | null (fallback) }]. */
+    function evaluations(rule) {
+      const names = Object.keys(rule.vars).map((n, i) => [n, i])
+        .sort((x, y) => ((rule.vars[x[0]].o || 1) - (rule.vars[y[0]].o || 1)) || (x[1] - y[1])).map(x => x[0]);
+      const V = names.map(n => {
+        const v = rule.vars[n];
+        const cands = facts.filter(f => v.f.every(x => match(f, x)) && rule.set.every(x => match(f, x)));
+        const c = covered(v);
+        const has = (a) => (a === 'concept' && c.concept) || (a === 'period' && c.period) || (a === 'unit' && c.unit) ||
+          (a.startsWith('dim:') && (c.dimensions || c.axes.has(a.slice(4))));
+        const defined = new Set(STD);
+        for (const f of cands) for (const x of f.d) defined.add('dim:' + x[0]);
+        const contrib = new Set(defined); // aspects this variable defines or covers (keys for the variables after it)
+        for (const a of STD) if (has(a)) contrib.add(a);
+        for (const a of c.axes) contrib.add('dim:' + a);
+        if (c.dimensions) for (const a of universe) contrib.add(a);
+        return { n, v, cands, has, defined: [...defined], contrib: [...contrib] };
+      });
+      const ids = new Map(facts.map((f, i) => [f, i]));
+      const keys = new Map(); // aspect -> fact that supplies its value, or null (covered: not compared)
+      const evals = [], prior = [], priorSet = new Set();
+      const bound = {};
+      const partitions = (cands, X) => {
+        const unc = X.defined.filter(a => !X.has(a));
+        const groups = new Map();
+        for (const f of cands) { const k = unc.map(a => aspectVal(f, a)).join('\u0001'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(f); }
+        const out = [];
+        for (const g of groups.values()) {
+          // matches="false": facts that are equal on every aspect cannot be in one sequence; each sub-sequence takes one of them
+          const same = new Map();
+          for (const f of g) { const k = X.defined.map(a => aspectVal(f, a)).join('\u0001'); if (!same.has(k)) same.set(k, []); same.get(k).push(f); }
+          let combos = [[]];
+          for (const alt of same.values()) { combos = combos.flatMap(cb => alt.map(f => cb.concat([f]))).slice(0, 32); }
+          out.push(...combos);
+        }
+        return out;
+      };
+      const rec = (i, anyFact) => {
+        if (i === V.length) {
+          const sig = V.map(X => bound[X.n] === null ? null : bound[X.n].map(f => ids.get(f)).join(','));
+          if (sig.every(s => s === null)) return; // every variable fell back
+          const key = sig.join('|');
+          if (priorSet.has(key)) return;
+          if (sig.includes(null) && prior.some(o => sig.every((s, j) => s === null || o[j] === s))) return; // fallback that repeats an evaluation
+          priorSet.add(key); prior.push(sig); evals.push(Object.assign({}, bound));
+          return;
+        }
+        const X = V[i];
+        let cands = X.cands;
+        if (anyFact) {
+          const test = [];
+          let blocked = false;
+          for (const a of new Set(X.defined.concat([...keys.keys()]))) {
+            if (X.has(a)) continue;
+            if (!keys.has(a)) { blocked = true; break; }
+            if (keys.get(a) !== null) test.push(a);
+          }
+          cands = blocked ? [] : cands.filter(f => test.every(a => aspectVal(f, a) === aspectVal(keys.get(a), a)));
+        }
+        for (const g of (X.v.seq ? partitions(cands, X) : cands.map(f => [f]))) {
+          const added = [];
+          for (const a of X.contrib) {
+            if (keys.has(a) && keys.get(a) !== null) continue;
+            added.push([a, keys.has(a) ? keys.get(a) : undefined]);
+            keys.set(a, X.has(a) ? null : g[0]);
+          }
+          bound[X.n] = g;
+          rec(i + 1, true);
+          for (let k = added.length - 1; k >= 0; k--) { const [a, prev] = added[k]; if (prev === undefined) keys.delete(a); else keys.set(a, prev); }
+        }
+        if (X.v.fb) { bound[X.n] = null; rec(i + 1, anyFact); }
+        delete bound[X.n];
+      };
+      rec(0, false);
+      return evals;
     }
     function sameUncovered(cand, ref, cov) {
       if (cov.all) return true;
@@ -971,7 +1063,7 @@
       return true;
     }
     const sel = (v, set) => facts.filter(f => v.f.every(x => match(f, x)) && set.every(x => match(f, x)));
-    return { P, dimVal, match, covered, sameUncovered, sel };
+    return { P, dimVal, match, covered, sameUncovered, sel, evaluations };
   }
 
   // Exact decimal arithmetic for the summation rules (like XPath xs:decimal: no floating point rounding).
@@ -998,102 +1090,72 @@
   }
 
   // ------------------------------------------------------------------ voorwaardelijke regels (value assertions)
+  // Every value assertion is evaluated on the bindings that Arelle would make (ruleHelpers().evaluations), then its test
+  // is applied: a conclusion that must (not) exist, a date order, the identifier, a total, a unit.
   function evalConditional(APP, ep, facts, entityId) {
     const rules = APP.eps[ep].cond || [];
     const errors = [];
-    const { dimVal, covered, sameUncovered, sel } = ruleHelpers(APP, facts);
+    const H = ruleHelpers(APP, facts);
     const label = (q) => q.split(':')[1];
+    const where = (f) => f ? f.d.map(x => label(x[0]).replace(/Axis$/, '') + '=' + (x[1] === 'e' ? label(x[2]) : x[2])).join(', ') : '';
     for (const rule of rules) {
-      const names = Object.keys(rule.vars);
-      const prem = names.filter(n => !rule.vars[n].fb && n !== rule.items);
-      if (rule.test === 'exists' || rule.test === 'notexists') {
-        const cv = rule.vars[rule.concl];
-        const candAll = sel(cv, rule.set);
-        const prv = prem.map(n => rule.vars[n]);
-        // typed-as-variant: premisse filtert alleen op een typed as (geen concept)
-        if (prv.length === 1 && prv[0].seq && !prv[0].f.some(x => x.t === 'c' || x.t === 'or')) {
-          const tf = prv[0].f.find(x => x.t === 't');
-          if (!tf) continue;
-          // XBRL-formula implicit filtering (as Arelle does): the typed-dimension filter does not cover its axis, so the conclusion
-          // must have exactly the same dimensions (axis values and any other axes) as each group of premise facts
-          const sig = (f) => f.d.map(x => x[0] + '=' + x[2]).sort().join('|');
-          const groups = new Map();
-          for (const f of sel(prv[0], rule.set)) if (!groups.has(sig(f))) groups.set(sig(f), f);
-          const candSigs = new Set(candAll.map(sig));
-          for (const [g, f] of groups) {
-            const has = candSigs.has(g);
-            if ((rule.test === 'exists') !== has) errors.push(rule.msg.replace(/\{m\}/g, dimVal(f, tf.a)) + (f.d.length > 1 ? ` (with ${f.d.filter(x => x[0] !== tf.a).map(x => x[0].split(':')[1] + ' ' + x[2].split(':').pop()).join(', ')})` : '') + ` [${rule.id}]`);
+      const seen = new Set();
+      const push = (m) => { if (!seen.has(m)) { seen.add(m); errors.push(m); } };
+      // the fact that triggered the evaluation (for the message): the first bound fact of a variable other than the conclusion
+      const premiseFact = (ev) => {
+        for (const [n, b] of Object.entries(ev)) if (n !== rule.concl && n !== rule.items && b && b.length && !(rule.vars[n].f.some(x => x.t === 'any'))) return b[0];
+        return null;
+      };
+      const typedValue = (f) => {
+        if (!f) return '';
+        const ax = Object.values(rule.vars).flatMap(v => v.f).concat(rule.set).find(x => x.t === 't' && !x.not && f.d.some(y => y[0] === x.a));
+        return ax ? H.dimVal(f, ax.a) : '';
+      };
+      for (const ev of H.evaluations(rule)) {
+        if (rule.pre) {
+          if (rule.pre.any) { if (!rule.pre.any.some(n => ev[n] && ev[n].length)) continue; }
+          else { const b = ev[rule.pre.v]; if (!b || !b.length || String(b[0].v) !== rule.pre.val) continue; }
+        }
+        switch (rule.test) {
+          case 'exists': case 'notexists': {
+            if ((ev[rule.concl] === null) !== (rule.test === 'exists')) break;
+            const pf = premiseFact(ev), w = where(pf);
+            push(rule.msg.replace(/\{m\}/g, typedValue(pf)) + (w ? ` (${w})` : '') + ` [${rule.id}]`);
+            break;
           }
-          continue;
-        }
-        if (!prv.length) continue;
-        // conclusie zonder concept, alleen een typed as ("<as> MUST be reported on"): bestaat er een feit met die as?
-        const axisOnly = !cv.f.some(x => x.t === 'c' || x.t === 'or') && cv.f.some(x => x.t === 't' && !x.not);
-        if (axisOnly) {
-          const prem0 = sel(rule.vars[prem[0]], rule.set);
-          if (prem0.length && (rule.test === 'exists') !== (candAll.length > 0)) errors.push(rule.msg.replace(/\{m\}/g, '') + ` [${rule.id}]`);
-          continue;
-        }
-        const ccov = covered(cv, rule.set);
-        const first = prem[0];
-        const seen = new Set();
-        for (const pf of sel(rule.vars[first], rule.set)) {
-          // overige premissen moeten meebinden
-          const bound = { [first]: pf };
-          let okBind = true;
-          for (const n of prem.slice(1)) {
-            const c2 = covered(rule.vars[n], rule.set);
-            const hit = sel(rule.vars[n], rule.set).find(f => sameUncovered(f, pf, c2));
-            if (!hit) { okBind = false; break; }
-            bound[n] = hit;
+          case 'datele': {
+            const a = ev[rule.a], b = ev[rule.b];
+            if (a && b && String(a[0].v) <= String(b[0].v)) break;
+            push(rule.msg + ` (${a ? a[0].v : 'missing'} > ${b ? b[0].v : 'missing'}) [${rule.id}]`);
+            break;
           }
-          if (!okBind) continue;
-          if (rule.pre) { const bf = bound[rule.pre.v]; if (!bf || String(bf.v) !== rule.pre.val) continue; }
-          const has = candAll.some(f => sameUncovered(f, pf, ccov));
-          if ((rule.test === 'exists') !== has) {
-            const where = pf.d.map(x => label(x[0]).replace(/Axis$/, '') + '=' + (x[1] === 'e' ? label(x[2]) : x[2])).join(', ');
-            const msg = rule.msg.replace(/\{m\}/g, '') + (where ? ` (${where})` : '') + ` [${rule.id}]`;
-            if (!seen.has(msg)) { seen.add(msg); errors.push(msg); }
+          case 'identifier': {
+            const k = ev[rule.b];
+            if (k && k.length && Number(k[0].v) === Number(entityId)) break;
+            push(rule.msg + ` (entity ${entityId}, ${k && k.length ? 'KvK ' + k[0].v : 'no KvK reported'}) [${rule.id}]`);
+            break;
           }
-        }
-      } else if (rule.test === 'datele') {
-        const va = rule.vars[rule.a], vb = rule.vars[rule.b];
-        const cb = covered(vb, rule.set);
-        for (const fa of sel(va, rule.set)) for (const fb of sel(vb, rule.set)) {
-          if (!sameUncovered(fb, fa, cb)) continue;
-          if (!(String(fa.v) <= String(fb.v))) errors.push(rule.msg + ` (${fa.v} > ${fb.v}) [${rule.id}]`);
-        }
-      } else if (rule.test === 'identifier') {
-        const vb = rule.vars[rule.b];
-        const cb = covered(vb, rule.set);
-        const pv = rule.pre && rule.vars[rule.pre.v];
-        if (!pv) continue;
-        for (const pf of sel(pv, rule.set)) {
-          if (String(pf.v) !== rule.pre.val) continue;
-          const k = sel(vb, rule.set).find(f => sameUncovered(f, pf, cb));
-          if (k && Number(k.v) !== Number(entityId)) errors.push(rule.msg + ` (entity ${entityId}, KvK ${k.v}) [${rule.id}]`);
-        }
-      } else if (rule.test === 'sum' || rule.test === 'sumdc') {
-        // total = sum of its children in the presentation network ('sum'), or debit children minus credit children ('sumdc', VT15).
-        // The children must have the same context and unit as the total (implicit filtering); without children there is no evaluation.
-        const kids = rule.test === 'sum' ? [rule.b] : [rule.db, rule.cr];
-        const pools = kids.map(n => ({ cov: covered(rule.vars[n]), facts: sel(rule.vars[n], rule.set) }));
-        for (const pf of sel(rule.vars[rule.a], rule.set)) {
-          const [plus, minus] = pools.map(p => p.facts.filter(f => sameUncovered(f, pf, p.cov)));
-          if (!plus.length && !(minus && minus.length)) continue;
-          const total = decTotal(plus.map(f => f.v), (minus || []).map(f => f.v)), own = decTotal([pf.v]);
-          if (!total || !own || decEq(own, total)) continue;
-          const parts = plus.map(f => `${label(f.c)} ${f.v}`).concat((minus || []).map(f => `- ${label(f.c)} ${f.v}`)).join(', ');
-          const where = pf.d.map(x => label(x[0]).replace(/Axis$/, '') + '=' + (x[1] === 'e' ? label(x[2]) : x[2])).join(', ');
-          errors.push(`${rule.msg} (${label(pf.c)} ${pf.v}, underlying values ${parts}: total ${decStr(total)}${where ? '; ' + where : ''}) [${rule.id}]`);
-        }
-      } else if (rule.test === 'unit') {
-        // every fact of the given data type (e.g. area) must use the measure of the taxonomy parameter (utr:sqm)
-        const want = rule.measureNs + '#' + rule.measure.split(':').pop();
-        for (const f of sel(rule.vars[rule.a], rule.set)) {
-          if (!f.u) continue; // a numeric fact without a unit is reported by the structure check
-          if (!f.u.some(m => (APP.ns[m.split(':')[0]] || '') + '#' + m.split(':').pop() === want)) {
-            errors.push(`${rule.msg.replace(/\{\$\w+\}/g, rule.measure)} (${label(f.c)}: ${f.u.join('*')}) [${rule.id}]`);
+          case 'sum': case 'sumdc': {
+            // total = sum of its children in the presentation network ('sum'), or debit children minus credit children ('sumdc', VT15)
+            const pf = ev[rule.a] && ev[rule.a][0];
+            if (!pf) break;
+            const plus = (rule.test === 'sum' ? ev[rule.b] : ev[rule.db]) || [], minus = rule.test === 'sumdc' ? (ev[rule.cr] || []) : [];
+            const total = decTotal(plus.map(f => f.v), minus.map(f => f.v)), own = decTotal([pf.v]);
+            if (!total || !own || decEq(own, total)) break;
+            const parts = plus.map(f => `${label(f.c)} ${f.v}`).concat(minus.map(f => `- ${label(f.c)} ${f.v}`)).join(', ');
+            const w = where(pf);
+            push(`${rule.msg} (${label(pf.c)} ${pf.v}, underlying values ${parts}: total ${decStr(total)}${w ? '; ' + w : ''}) [${rule.id}]`);
+            break;
+          }
+          case 'unit': {
+            // every fact of the given data type (e.g. area) must use the measure of the taxonomy parameter (utr:sqm)
+            const f = ev[rule.a] && ev[rule.a][0];
+            if (!f || !f.u) break; // a numeric fact without a unit is reported by the structure check
+            const want = rule.measureNs + '#' + rule.measure.split(':').pop();
+            if (!f.u.some(m => (APP.ns[m.split(':')[0]] || '') + '#' + m.split(':').pop() === want)) {
+              push(`${rule.msg.replace(/\{\$\w+\}/g, rule.measure)} (${label(f.c)}: ${f.u.join('*')}) [${rule.id}]`);
+            }
+            break;
           }
         }
       }

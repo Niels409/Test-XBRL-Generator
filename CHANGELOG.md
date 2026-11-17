@@ -18,9 +18,18 @@ generated XBRL file and in the test report.
 - `build/build_rules.py` stops with an error on a filter, test or precondition it does not support, so a new taxonomy
   version cannot lose rules unnoticed. `build/inject_rules.py` updates the rules in existing app data.
 
-### Fixed
-- Rules with an aspect cover on all dimensions (two in VT15) now ignore the dimensions when matching facts, as the
-  taxonomy defines.
+### Changed
+- One evaluation engine for all business rules that binds facts the way Arelle does (XBRL Formula with implicit
+  filtering): variables in the order of the taxonomy, only the aspects a filter really covers are ignored, a variable whose
+  facts use a dimension unknown to the variables before it binds nothing, fallback values only when no fact binds. The
+  rule-specific shortcuts are gone.
+
+### Fixed (found by the comparison with Arelle)
+- `DebitorParty_PrtValueThnAllEqualToIdentifier1`: when the debtor's KvK number is missing, the rule is broken (it was
+  not reported).
+- Totals whose parts also occur in other contexts with an extra dimension: Arelle does not evaluate the total there, and
+  neither does the built-in check now.
+- Rules with an aspect cover on all dimensions (two in VT15) now ignore the dimensions when matching facts.
 
 ## 2.0.0 — 2026-11-17
 
