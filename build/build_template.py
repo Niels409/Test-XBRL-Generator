@@ -1,4 +1,8 @@
-"""Maakt het Excel-sjabloon (één tabblad) voor VT17-testscenario's."""
+"""Builds the Excel template (one sheet) for the test scenarios.
+
+python3 build_template.py <appdata-vt17.json> <out.xlsx> [rows.json]
+rows.json (optional) = a scenario set: {"title": ..., "rows": [{tax, product, case, report, use, street, nr, add, pc, vbos: [[id, use, value]], date, kvk, desc}]}
+"""
 import json, sys
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -8,6 +12,8 @@ from openpyxl.utils import get_column_letter
 
 APP = json.load(open(sys.argv[1]))
 OUT = sys.argv[2]
+SET = json.load(open(sys.argv[3], encoding='utf-8')) if len(sys.argv) > 3 else None
+HAS_DESC = True
 N_PAIRS = 6
 HEADER_ROW = 10
 N_ROWS = 300
@@ -48,6 +54,8 @@ COLS += [
     ('Valuer CoC number', 14, 3, 'Chamber of Commerce (KvK) number of the valuation firm, 8 digits.'),
 ]
 NFIX = len(COLS)
+COLS.append(('Description', 50, 4, 'What this scenario tests. Not written to the XBRL; shown in the app and in the test report.'))
+COLS.append(('Expected result', 16, 4, 'Optional: No deviations, Deviations or Not generated. The test report shows whether the outcome matches.'))
 NCOL = len(COLS)
 LASTCOL = get_column_letter(NCOL)
 
@@ -56,6 +64,7 @@ GROUPS = [  # naam, band-kleur, kop-tint
     ('Address', '2E6B57', 'DCEDE5'),
     ('VBOs and market value per VBO', '5B4A7A', 'E8E3F0'),
     ('Valuation and valuer', '8A5A1F', 'F3E8D8'),
+    ('Scenario', '4A5F73', 'E6EAEE'),
 ]
 
 # ---------------------------------------------------------------- titelband
@@ -64,10 +73,10 @@ for r in (1, 2):
         ws.cell(row=r, column=ci).fill = fill(NAVY)
 ws.row_dimensions[1].height = 36
 ws.row_dimensions[2].height = 20
-ws['A1'] = 'VT Test Generator · test scenarios (VT17 / VT15)'
+ws['A1'] = 'Test XBRL Generator · ' + (SET['title'] if SET else 'test scenarios (VT17 / VT15)')
 ws['A1'].font = Font(name=F, size=18, bold=True, color='FFFFFF')
 ws['A1'].alignment = Alignment(vertical='center', indent=1)
-ws['A2'] = f"Dutch real estate taxonomy {APP['version']} and VT15 (20210421) · load this file into the VT17 Test Generator"
+ws['A2'] = f"Dutch real estate taxonomy {APP['version']} and VT15 (20210421) · load this file into the Test XBRL Generator"
 ws['A2'].font = Font(name=F, size=10, color='B8CAD6')
 ws['A2'].alignment = Alignment(vertical='top', indent=1)
 
@@ -76,7 +85,7 @@ HELP = [
     ('How it works', 'One row per test. Each row becomes one XBRL file. Everything not listed here is filled in with realistic data.'),
     ('Required', 'Only Data product (marked with *). All other columns may be left empty. Taxonomy empty = VT17.'),
     ("VBOs", 'Up to 5 VBOs per test: VBO ID, its Use and its market value. Only the parts of the matching use are filled (commercial / residential / agricultural); Unlinked VBOs are not linked to a unit. The address applies to VBO 1.'),
-    ('Examples & tips', 'The light blue rows are examples; overwrite or delete them. Negative test: type EMPTY in a field to leave it out of the XBRL; invalid values are written as given and shown as deviations.'),
+    ('Examples & tips', ('The light blue rows are the scenarios of this set; change or extend them as you like.' if SET else 'The light blue rows are examples; overwrite or delete them.') + ' Negative test: type EMPTY in a field to leave it out of the XBRL; invalid values are written as given and shown as deviations.'),
 ]
 HELP_END = 4 + len(HELP)
 for i, (lab, txt) in enumerate(HELP):
@@ -128,7 +137,13 @@ def ex(tax, prod, case, rep, use, street, nr, add, pc, vbos, date, kvk):
     for n in range(N_VBO):
         row += list(vbos[n]) if n < len(vbos) else ['', '', '']
     return row + [date, kvk, []]
-examples = [
+if SET:
+    examples = [ex(r.get('tax', 'VT17'), r['product'], r.get('case', ''), r.get('report', ''), r.get('use', ''), r.get('street', ''), r.get('nr', ''), r.get('add', ''), r.get('pc', ''),
+                   [tuple(v) for v in r.get('vbos', [])], r.get('date', ''), r.get('kvk', '')) for r in SET['rows']]
+    for e, r in zip(examples, SET['rows']):
+        e.append([r.get('desc', ''), r.get('expected', '')])
+else:
+  examples = [
     ex('VT17', 'Taxatierapport', 'CASE-2026-000101', 'VR-2026-0457', 'Residential', 'Prinsengracht', '263', 'a', '1017AB',
        [('200000058297', 'Residential', 1250000)], '30-10-2026', '34567890'),
     ex('VT17', 'Taxatierapport', 'CASE-2026-000102', 'VR-2026-0458', 'Mixed use', 'Keizersgracht', '120', '', '1015CX',
@@ -139,7 +154,10 @@ examples = [
        [('200000058304', 'Residential', 410000)], '29-10-2026', '67812345'),
     ex('VT17', 'Opdrachtbrief', 'CASE-2026-000105', 'VR-2026-0459', 'Commercial', 'Coolsingel', '40', 'B', '3011AA',
        [('200000058300', 'Commercial', '')], '', '24123456'),
-]
+  ]
+  for e, d in zip(examples, [('One home', 'No deviations'), ('Shop with home above it and a parking space', 'No deviations'),
+                             ('Farm with land', 'No deviations'), ('VT15: one home', 'No deviations'), ('Engagement letter for a commercial property', 'No deviations')]):
+      e.append(list(d))
 FIRST = HEADER_ROW + 1
 LAST = HEADER_ROW + N_ROWS
 ex_fill = fill('EAF2FA')
@@ -162,8 +180,7 @@ for r in range(FIRST, LAST + 1):
     if is_ex:
         ex = examples[r - FIRST]
         vals = ex[:NFIX]
-        for t in ex[NFIX]:
-            vals += list(t)
+        vals += list(ex[NFIX + 1]) if len(ex) > NFIX + 1 else ['', '']
         for ci, v in enumerate(vals, start=1):
             if v != '':
                 ws.cell(row=r, column=ci, value=v)
@@ -199,6 +216,9 @@ for ci in range(1, NCOL + 1):
     elif h.startswith('Market value'):
         dv(ci, type='whole', operator='greaterThanOrEqual', formula1='0', showErrorMessage=True,
            errorTitle='Invalid amount', error='Enter an amount in whole euros, without separators or text.')
+    elif h == 'Expected result':
+        dv(ci, type='list', formula1='"No deviations,Deviations,Not generated"', showErrorMessage=True,
+           errorTitle='Unknown expected result', error='Pick No deviations, Deviations or Not generated.')
     elif h.startswith('Use'):
         dv(ci, type='list', formula1='"Commercial,Residential,Mixed use,Agricultural"', showErrorMessage=True,
            errorTitle='Unknown use', error='Pick Commercial, Residential, Mixed use or Agricultural (VT17 only).')
