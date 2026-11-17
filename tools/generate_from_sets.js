@@ -1,6 +1,6 @@
 /* Generates every scenario of the scenario sets (Excel files) as XBRL files.
  * node tools/generate_from_sets.js <dir with set .xlsx files> <out dir>
- * Writes <out>/<set>/<file>.xbrl and <out>/expected.json: { "<set>/<file>": { expected, own, test, description } }
+ * Writes <out>/<set>/<file>.xbrl, <out>/baseline/<official examples>.xbrl and <out>/expected.json: { "<set>/<file>": { expected, own, test, description } }
  */
 'use strict';
 const fs = require('fs'), path = require('path');
@@ -28,6 +28,15 @@ const norm = (t) => { t = String(t || '').toLowerCase(); return /^not generated/
         ownDeviations: it.status === 'failed' ? it.r.errors : it.r.validation.errors };
       if (it.name) { fs.writeFileSync(path.join(outDir, set, it.name), it.r.xml); n++; }
     }
+  }
+  // baseline: the official SBR Nexus example messages as compiled in data/ (shows what Arelle reports on the official examples)
+  fs.mkdirSync(path.join(outDir, 'baseline'), { recursive: true });
+  for (const [tax, m] of Object.entries(M)) for (const ep of Object.keys(m.APP.eps)) {
+    const E = m.APP.eps[ep];
+    const name = `${tax}_${ep}_official-example.xbrl`;
+    fs.writeFileSync(path.join(outDir, 'baseline', name), Core.serialize(m.APP, ep, E.base.facts.map(f => ({ c: f.c, d: f.d, v: f.v, u: f.u || null, dec: f.dec || null })), E.base.entity, E.base.anchor));
+    expected['baseline/' + name] = { test: `${tax} ${ep} official example`, description: 'Official SBR Nexus example message (baseline)', expected: 'ok', own: 'ok', ownDeviations: [] };
+    n++;
   }
   fs.writeFileSync(path.join(outDir, 'expected.json'), JSON.stringify(expected, null, 1));
   console.log(`${n} XBRL files written to ${outDir}`);

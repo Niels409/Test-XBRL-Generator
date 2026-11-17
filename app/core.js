@@ -1136,7 +1136,7 @@
       const dev = status === 'failed' ? (r.errors || []) : r.validation.errors;
       rows.push([sc.row || '', sc.id, sc.omschrijving || '', r.tax || sc.taxonomy || '', r.ep || sc.dataproduct || '', sc.caseId || '', r.procesId || '', (sc.fixed || {}).useType || '',
         (r.vbos || sc.vbos || []).join('\n'), (sc.vboUses || []).join('\n'), (sc.vboValues || []).map(v => v == null ? '' : v).join('\n'),
-        total && /^-?\d+(\.\d+)?$/.test(total.v) ? Number(total.v) : (total ? total.v : ''), r.peildatum || '', name, RES[status],
+        total && /^-?\d+(\.\d+)?$/.test(total.v) ? Number(total.v) : (total ? total.v : ''), /^\d{4}-\d{2}-\d{2}$/.test(r.peildatum || '') ? r.peildatum.split('-').reverse().join('-') : (r.peildatum || ''), name, RES[status],
         sc.verwacht || '', expectedOf(sc) ? (expectedOf(sc) === status ? 'Yes' : 'NO') : '', status === 'failed' ? '' : dev.length,
         dev.join('\n'), (r.warnings || []).concat(r.validation ? r.validation.warnings : []).join('\n'), (r.log || []).join('\n')]);
     }
@@ -1147,7 +1147,7 @@
     for (const i of items) { const k = `${i.r.tax || i.sc.taxonomy || '?'} ${i.r.ep || i.sc.dataproduct || '?'}`; per[k] = (per[k] || 0) + 1; }
     const summary = [['Test report', ''], ['Generator', `${APP_NAME} v${VERSION}`], ['Generated on', stamp], ['Source file', opts.source || ''], ['', ''],
       ['Tests in the Excel', items.length], [RES.ok, n('ok')], [RES.deviations, n('deviations')], [RES.failed, n('failed')], ['', ''],
-      ['Tests with an expected result', withExp.length], ['Outcome as expected', withExp.length - mism.length], ['Outcome NOT as expected', mism.length + (mism.length ? ': ' + mism.map(i => i.sc.id).join(', ') : '')], ['', ''], ['Per data product', '']]
+      ['Tests with an expected result', withExp.length], ['Outcome as expected', withExp.length - mism.length], ['Outcome NOT as expected', mism.length ? `${mism.length}: ${mism.map(i => i.sc.id).join(', ')}` : 0], ['', ''], ['Per data product', '']]
       .concat(Object.keys(per).sort().map(k => [k, per[k]]))
       .concat([['', ''], ['Note', 'Deviations are found by the built-in check against the taxonomy (structure, data types, required fields and most business rules). It is not a certified XBRL validator.']]);
     return { stamp, mismatches: mism.length, sheets: [{ name: 'Test report', rows, widths: [8, 22, 44, 9, 22, 22, 16, 13, 18, 13, 14, 14, 12, 40, 24, 16, 10, 10, 70, 70, 70], header: true },

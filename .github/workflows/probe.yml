@@ -7,10 +7,11 @@ permissions:
 jobs:
   arelle:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 40
     env:
       VT17_PACKAGE_URL: https://pub-5ff4320167a14f958d5d55262805643c.r2.dev/media/VT17_FRC_20240131_Package_update_20260804.zip
       VT15_PACKAGE_URL: https://pub-5ff4320167a14f958d5d55262805643c.r2.dev/media/VT15_FRC_20210421_Package.zip
+      VT15_EXTRA_URL: https://pub-5ff4320167a14f958d5d55262805643c.r2.dev/media/VT15.zip
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,25 +21,40 @@ jobs:
         with:
           node-version: '20'
       - run: pip install --quiet arelle-release openpyxl
+      - name: Arelle formula options
+        run: arelleCmdLine --help | grep -i -A2 "formulaUnsatisfied\|formulaAsser\|--formula " | head -40
       - name: Download taxonomy packages
         run: |
-          mkdir -p pkg
-          curl -sSfL "$VT17_PACKAGE_URL" -o pkg/vt17.zip
-          curl -sSfL "$VT15_PACKAGE_URL" -o pkg/vt15.zip
+          mkdir -p dl pkg
+          curl -sSfL "$VT17_PACKAGE_URL" -o dl/vt17.zip
+          curl -sSfL "$VT15_PACKAGE_URL" -o dl/vt15.zip
+          curl -sSfL "$VT15_EXTRA_URL" -o dl/vt15extra.zip || true
+          unzip -l dl/vt15extra.zip | head -30 || true
+          python3 tools/prepare_package.py dl/vt17.zip pkg/vt17.zip
+          python3 tools/prepare_package.py dl/vt15.zip pkg/vt15.zip
+          ls -la pkg pkg/*-examples || true
+          unzip -p pkg/vt17.zip '*/META-INF/taxonomyPackage.xml' | grep -i "version\|identifier\|name" | head -10
           sha256sum pkg/*.zip
-          for z in pkg/*.zip; do unzip -l "$z" | head -8; unzip -l "$z" | tail -1; done
-          unzip -p pkg/vt17.zip '*/META-INF/taxonomyPackage.xml' | head -40
       - name: Generate the scenario sets
         run: |
           python3 build/scenario_sets.py data/appdata-vt17.json sets
           node tools/generate_from_sets.js sets gen
-      - name: Validate with Arelle
+          mkdir -p sel && cp gen/07-negative-tests/S7-NEG-0{1,5,9}_Taxatierapport.xbrl gen/07-negative-tests/S7-NEG-19_Taxatierapport.xbrl gen/01-residential-vt17/S1-RES-01_Taxatierapport.xbrl gen/03-mixed-and-unlinked-vt17/S3-MIX-01_Taxatierapport.xbrl sel/
+          cp gen/baseline/VT17_Taxatierapport_official-example.xbrl sel/ && cp pkg/vt17-examples/*taxatierapport.xbrl sel/ 2>/dev/null || true
+          ls sel
+      - name: Validate a selection with Arelle (diagnostic, info level)
         run: |
-          python3 tools/arelle_validate.py --packages pkg/vt17.zip pkg/vt15.zip --out arelle --expected gen/expected.json --jobs 4 gen || true
-          cat arelle/summary.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: arelle-results
-          path: arelle
-          retention-days: 7
+          python3 tools/arelle_validate.py --packages pkg/vt17.zip pkg/vt15.zip --out arelle --log-level info --jobs 4 sel || true
+          python3 - <<'PY'
+          import json, glob
+          for f in sorted(glob.glob('arelle/**/*.log.xml', recursive=True)):
+              import xml.etree.ElementTree as ET
+              es = list(ET.parse(f).getroot().iter('entry'))
+              from collections import Counter
+              c = Counter((e.get('level'), e.get('code')) for e in es)
+              print('=====', f, len(es), 'entries')
+              for (lvl, code), n in c.most_common(25): print(f'   {n:4d} {lvl:8s} {code}')
+              for e in es:
+                  if e.get('code', '').startswith(('formula:assertionResult', 'formula:assertionResultCounts')) or 'Unsatisfied' in (e.get('code') or ''):
+                      m = e.find('message'); print('   >>', e.get('level'), e.get('code'), (m.text or '')[:400]); 
+          PY
