@@ -1,0 +1,41 @@
+name: probe
+on:
+  push:
+    branches: [ci-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Discover taxonomy download links
+        run: |
+          for u in https://sbrnexus.nl/taxonomieen/vastgoedtaxonomie/vastgoedtaxonomie-17 https://sbrnexus.nl/taxonomieen/vastgoedtaxonomie/vastgoedtaxonomie-15; do
+            echo "==== $u"
+            curl -sSL -A "Mozilla/5.0" "$u" -o page.html; wc -c page.html
+            echo "-- urls"; grep -oE 'https?://[^"'"'"' <>)\\]+' page.html | grep -iE 'zip|download|media|r2\.dev|api|cms|files|uploads' | sort -u | head -60
+            echo "-- zip strings"; grep -oiE '[^"'"'"' <>()]*\.zip[^"'"'"' <>()]*' page.html | sort -u | head -20
+            echo "-- hrefs"; grep -oE 'href="[^"]+"' page.html | sort -u | head -80
+            echo "-- scripts"; grep -oE 'src="[^"]+\.js[^"]*"' page.html | sort -u | head -20
+            for js in $(grep -oE 'src="[^"]+\.js[^"]*"' page.html | sed 's/src="//;s/"$//' | sort -u | head -40); do
+              case "$js" in http*) full="$js";; //*) full="https:$js";; *) full="https://sbrnexus.nl$js";; esac
+              curl -sSL "$full" | grep -oiE '[^"'"'"' ]{0,120}(\.zip|r2\.dev|/api/)[^"'"'"' ]{0,80}' | sort -u | head -8
+            done
+          done
+          echo "==== hosted schemas?"
+          for u in https://www.sbrnexus.nl/vt17/frc/20240131/entrypoints/frc-rpt-vt-taxatierapport.xsd https://www.sbrnexus.nl/vt15/frc/20210421/entrypoints/frc-rpt-vt-taxatierapport.xsd http://www.nltaxonomie.nl/nt17/sbr/20220301/dictionary/nl-common-data.xsd http://www.nltaxonomie.nl/nt15/sbr/20200301/dictionary/nl-common-data.xsd; do
+            curl -sSL -o /dev/null -w "%{http_code} %{content_type} %{size_download} $u\n" "$u" || true
+          done
+      - name: Install Arelle
+        run: |
+          pip install --quiet arelle-release
+          python -c "import arelle, importlib.metadata as m; print('arelle', m.version('arelle-release'))"
+          arelleCmdLine --help | head -5 || true
