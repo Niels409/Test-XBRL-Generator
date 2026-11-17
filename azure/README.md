@@ -26,7 +26,7 @@ No outbound network access is needed; the VT17 and VT15 taxonomies are embedded 
 
 ## Files
 
-- `core.js` — taxonomy model access, realistic data, XBRL serialisation, validation (existence + conditional rules: VT17 192, VT15 258)
+- `core.js` — taxonomy model access, realistic data, XBRL serialisation, validation (all formula assertions of the taxonomy: VT17 201 value + 48 existence, VT15 270 + 49)
 - `xlsx.js` — minimal .xlsx reader (no dependencies)
 - `appdata.json` — VT17 model (concepts, hypercubes, rules) + official SBR Nexus example messages + synthetic residential/agricultural parts
 - `appdata-vt15.json` — VT15 model + official examples + anonymised residential VT15 base

@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.1.0';
   const APP_NAME = 'Test XBRL Generator';
   const DIM_VBO = 'frc-vt-dim:BAGVBOIDAxis';
   const DIM_PAND = 'frc-vt-dim:BAGPANDIDAxis';
@@ -936,10 +936,8 @@
   }
 
   // ------------------------------------------------------------------ validatie
-  // ------------------------------------------------------------------ voorwaardelijke regels (value assertions uit VT17)
-  function evalConditional(APP, ep, facts, entityId) {
-    const rules = APP.eps[ep].cond || [];
-    const errors = [];
+  // Shared by the value assertions and the existence assertions of the taxonomy (compiled by build/build_rules.py).
+  function ruleHelpers(APP, facts) {
     const P = (f) => ((APP.concepts[f.c] || {}).p) || 'd';
     const dimVal = (f, a) => { const x = f.d.find(y => y[0] === a); return x ? x[2] : null; };
     function match(f, flt) {
@@ -953,7 +951,7 @@
       }
       return flt.not ? !ok : ok;
     }
-    function covered(v, set) {
+    function covered(v) {
       const cov = { concept: false, period: false, unit: false, all: false, axes: new Set() };
       for (const flt of v.f) { // groepsfilters (variable-set) dekken geen aspecten af; dat sluit aan bij de officiële voorbeeldberichten
         if (flt.t === 'c' || (flt.t === 'or' && flt.f.some(x => x.t === 'c'))) cov.concept = true;
@@ -967,11 +965,43 @@
       if (!cov.concept && cand.c !== ref.c) return false;
       if (!cov.period && P(cand) !== P(ref)) return false;
       if (!cov.unit && (cand.u || []).join(' ') !== (ref.u || []).join(' ')) return false;
+      if (cov.dimensions) return true; // aspect cover 'dimensions' covers every dimension
       const axes = new Set(cand.d.map(x => x[0]).concat(ref.d.map(x => x[0])));
       for (const a of axes) if (!cov.axes.has(a) && dimVal(cand, a) !== dimVal(ref, a)) return false;
       return true;
     }
     const sel = (v, set) => facts.filter(f => v.f.every(x => match(f, x)) && set.every(x => match(f, x)));
+    return { P, dimVal, match, covered, sameUncovered, sel };
+  }
+
+  // Exact decimal arithmetic for the summation rules (like XPath xs:decimal: no floating point rounding).
+  function decParse(v) {
+    const m = /^\s*([+-]?)(\d*)(?:\.(\d*))?\s*$/.exec(String(v));
+    return m && (m[2] || m[3]) ? { neg: m[1] === '-', i: m[2] || '0', f: m[3] || '' } : null;
+  }
+  /** sum(plus) - sum(minus) as { n: BigInt, k: decimals }, or null when a value is not a decimal number */
+  function decTotal(plus, minus) {
+    const ps = plus.map(decParse), ms = (minus || []).map(decParse);
+    if (ps.concat(ms).some(p => !p)) return null;
+    const k = Math.max(0, ...ps.concat(ms).map(p => p.f.length));
+    const big = (p) => (p.neg ? -1n : 1n) * BigInt(p.i + p.f.padEnd(k, '0'));
+    return { n: ps.reduce((t, p) => t + big(p), 0n) - ms.reduce((t, p) => t + big(p), 0n), k };
+  }
+  function decEq(a, b) {
+    const k = Math.max(a.k, b.k), s = (d) => d.n * 10n ** BigInt(k - d.k);
+    return s(a) === s(b);
+  }
+  function decStr(d) {
+    const neg = d.n < 0n, s = (neg ? -d.n : d.n).toString().padStart(d.k + 1, '0');
+    const out = d.k ? (s.slice(0, -d.k) + '.' + s.slice(-d.k)).replace(/\.?0+$/, '') : s;
+    return (neg ? '-' : '') + out;
+  }
+
+  // ------------------------------------------------------------------ voorwaardelijke regels (value assertions)
+  function evalConditional(APP, ep, facts, entityId) {
+    const rules = APP.eps[ep].cond || [];
+    const errors = [];
+    const { dimVal, covered, sameUncovered, sel } = ruleHelpers(APP, facts);
     const label = (q) => q.split(':')[1];
     for (const rule of rules) {
       const names = Object.keys(rule.vars);
@@ -1043,7 +1073,43 @@
           const k = sel(vb, rule.set).find(f => sameUncovered(f, pf, cb));
           if (k && Number(k.v) !== Number(entityId)) errors.push(rule.msg + ` (entity ${entityId}, KvK ${k.v}) [${rule.id}]`);
         }
+      } else if (rule.test === 'sum' || rule.test === 'sumdc') {
+        // total = sum of its children in the presentation network ('sum'), or debit children minus credit children ('sumdc', VT15).
+        // The children must have the same context and unit as the total (implicit filtering); without children there is no evaluation.
+        const kids = rule.test === 'sum' ? [rule.b] : [rule.db, rule.cr];
+        const pools = kids.map(n => ({ cov: covered(rule.vars[n]), facts: sel(rule.vars[n], rule.set) }));
+        for (const pf of sel(rule.vars[rule.a], rule.set)) {
+          const [plus, minus] = pools.map(p => p.facts.filter(f => sameUncovered(f, pf, p.cov)));
+          if (!plus.length && !(minus && minus.length)) continue;
+          const total = decTotal(plus.map(f => f.v), (minus || []).map(f => f.v)), own = decTotal([pf.v]);
+          if (!total || !own || decEq(own, total)) continue;
+          const parts = plus.map(f => `${label(f.c)} ${f.v}`).concat((minus || []).map(f => `- ${label(f.c)} ${f.v}`)).join(', ');
+          const where = pf.d.map(x => label(x[0]).replace(/Axis$/, '') + '=' + (x[1] === 'e' ? label(x[2]) : x[2])).join(', ');
+          errors.push(`${rule.msg} (${label(pf.c)} ${pf.v}, underlying values ${parts}: total ${decStr(total)}${where ? '; ' + where : ''}) [${rule.id}]`);
+        }
+      } else if (rule.test === 'unit') {
+        // every fact of the given data type (e.g. area) must use the measure of the taxonomy parameter (utr:sqm)
+        const want = rule.measureNs + '#' + rule.measure.split(':').pop();
+        for (const f of sel(rule.vars[rule.a], rule.set)) {
+          if (!f.u) continue; // a numeric fact without a unit is reported by the structure check
+          if (!f.u.some(m => (APP.ns[m.split(':')[0]] || '') + '#' + m.split(':').pop() === want)) {
+            errors.push(`${rule.msg.replace(/\{\$\w+\}/g, rule.measure)} (${label(f.c)}: ${f.u.join('*')}) [${rule.id}]`);
+          }
+        }
       }
+    }
+    return errors;
+  }
+
+  // ------------------------------------------------------------------ existence assertions (fields that must be reported)
+  function evalExistence(APP, ep, facts) {
+    const { match } = ruleHelpers(APP, facts);
+    const errors = [];
+    for (const rule of APP.eps[ep].req || []) {
+      const n = facts.filter(f => rule.f.every(x => match(f, x)) && rule.set.every(x => match(f, x))).length;
+      if (rule.test === 'eq1' ? n === 1 : n > 0) continue;
+      errors.push(rule.c ? `Required field missing: ${rule.c.split(':')[1]} [${rule.id}]`
+        : `${String(rule.m || 'Existence rule not met').replace(/`/g, '')}${rule.test === 'eq1' ? ` (found ${n})` : ''} [${rule.id}]`);
     }
     return errors;
   }
@@ -1078,14 +1144,7 @@
       seen.set(k, f.v);
     }
     // verplichte velden (existence-assertions uit de taxonomie)
-    for (const rule of E.req) {
-      const ok = facts.some(f => f.c === rule.c && Object.entries(rule.x).every(([a, m]) => f.d.some(y => y[0] === a && (m === null || y[2] === m))) && rule.t.every(a => f.d.some(y => y[0] === a)) && (rule.n || []).every(spec => {
-        const [a, ms] = spec.split('=');
-        const mem = ms ? ms.split(',') : null;
-        return !f.d.some(y => y[0] === a && (!mem || mem.indexOf(y[2]) >= 0));
-      }));
-      if (!ok) errors.push(`Required field missing: ${rule.c.split(':')[1]}`);
-    }
+    for (const e of evalExistence(APP, ep, facts)) errors.push(e);
     // realisme-signalen
     const dcd = facts.find(f => f.c === 'nl-cd:DocumentCreationDate');
     if (dcd) {
@@ -1154,10 +1213,17 @@
       ['Tests in the Excel', items.length], [RES.ok, n('ok')], [RES.deviations, n('deviations')], [RES.failed, n('failed')], ['', ''],
       ['Tests with an expected result', withExp.length], ['Outcome as expected', withExp.length - mism.length], ['Outcome NOT as expected', mism.length ? `${mism.length}: ${mism.map(i => i.sc.id).join(', ')}` : 0], ['', ''], ['Per data product', '']]
       .concat(Object.keys(per).sort().map(k => [k, per[k]]))
-      .concat([['', ''], ['Note', 'Deviations are found by the built-in check against the taxonomy (structure, data types, required fields and most business rules). It is not a certified XBRL validator.']]);
+      .concat([['', ''], ['Note', 'Deviations are found by the built-in check against the taxonomy (structure, data types and all business rules of the taxonomy: required fields, conditional rules, totals, units). It is not a certified XBRL validator; the automatic tests of the project compare these rules with Arelle.']]);
     return { stamp, mismatches: mism.length, sheets: [{ name: 'Test report', rows, widths: [8, 22, 44, 9, 22, 22, 16, 13, 18, 13, 14, 14, 12, 40, 24, 16, 10, 10, 70, 70, 70], header: true },
       { name: 'Summary', rows: summary, widths: [34, 60], header: true }] };
   }
 
-  return { VERSION, APP_NAME, runBatch, buildReport, fileNameFor, Model, pickModel, useCode, generate, validate, serialize, parseDateExpr, isoDate, fmtNL, todayUTC, defaultCaseTarget, caseTargetOptions, checkValue };
+  /** The assertion ids in a list of deviations (each taxonomy rule ends its message with "[id]"). */
+  function assertionIds(errors) {
+    const out = new Set();
+    for (const e of errors || []) { const m = /\[([A-Za-z0-9_-]+)\]\s*$/.exec(e); if (m) out.add(m[1]); }
+    return [...out].sort();
+  }
+
+  return { VERSION, APP_NAME, runBatch, buildReport, fileNameFor, Model, pickModel, useCode, generate, validate, serialize, parseDateExpr, isoDate, fmtNL, todayUTC, defaultCaseTarget, caseTargetOptions, checkValue, ruleHelpers, assertionIds };
 });

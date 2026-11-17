@@ -3,6 +3,25 @@
 All notable changes to the Test XBRL Generator. The version is shown in the app footer, in a comment at the top of every
 generated XBRL file and in the test report.
 
+## 2.1.0 — 2026-11-17
+
+### Added
+- **The built-in check evaluates every business rule of the taxonomies**: all formula assertions, VT17 201 value assertions
+  and 48 existence assertions, VT15 270 and 49 (was: 192 and 258 value assertions and most existence assertions). New are
+  the totals that must equal the sum of their parts (parking places, corrections, costs; in VT15 debit minus credit), the
+  unit of areas (VT15: m²), the "exactly one of" rules (place of residence or postcode in the Netherlands or abroad,
+  location description) and the rules that only require an axis to be reported (land register, valuer).
+- Every deviation from a business rule names that rule, for example `[House_PrtSumOfChildren1]`, also for required fields.
+- **Rule-by-rule comparison with Arelle** in CI: for every file, the rules reported by Arelle and by the built-in check must
+  be identical. Besides the scenario sets this runs on a mutation corpus (`tools/mutants.js`): for every rule that occurs in
+  the generated reports, one report is changed so that it breaks that rule.
+- `build/build_rules.py` stops with an error on a filter, test or precondition it does not support, so a new taxonomy
+  version cannot lose rules unnoticed. `build/inject_rules.py` updates the rules in existing app data.
+
+### Fixed
+- Rules with an aspect cover on all dimensions (two in VT15) now ignore the dimensions when matching facts, as the
+  taxonomy defines.
+
 ## 2.0.0 — 2026-11-17
 
 ### Added

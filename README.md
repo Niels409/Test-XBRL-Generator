@@ -63,13 +63,17 @@ The sets are built by `build/scenario_sets.py`; in the app they are under step 1
 ## Validation
 
 **Built-in check (in the app).** Each file is checked before it is offered: concepts, dimensions/hypercubes, periods, units, data types and
-facets (including the Nederlandse Taxonomie types such as `StreetNameNL` max. 24 characters and the SBI code list), required existence
-assertions and most conditional value assertions (VT17: 192 of 201, VT15: 258 of 270).
+facets (including the Nederlandse Taxonomie types such as `StreetNameNL` max. 24 characters and the SBI code list), and **all business rules
+(formula assertions) of the taxonomy**: VT17 201 value assertions and 48 existence assertions, VT15 270 and 49. That covers the required
+fields, the conditional rules, the totals that must equal their parts (for example `ParkingLotsRented` = inside + outside) and the unit of
+areas. Every deviation names the rule it breaks, for example `[House_PrtSumOfChildren1]`.
 
 **Official validation (Arelle, on GitHub).** On every push, GitHub Actions generates all scenario sets and the official example messages and
 validates every file with [Arelle](https://arelle.org), the open-source XBRL processor, against the official SBR Nexus taxonomy packages:
-XML Schema, XBRL 2.1, dimensions and all formula assertions of the taxonomy. The result is in the job summary and as a downloadable artifact.
-Run it locally with:
+XML Schema, XBRL 2.1, dimensions and all formula assertions of the taxonomy. For every file the business rules that Arelle reports are
+compared with those of the built-in check; they must be identical. The comparison also runs on a mutation corpus (`tools/mutants.js`): for
+every rule that occurs in the generated reports, one report is changed so that it breaks that rule. The result is in the job summary and
+as a downloadable artifact. Run it locally with:
 
 ```bash
 pip install arelle-release
@@ -83,7 +87,7 @@ python3 tools/arelle_validate.py --packages VT17_package.zip VT15_package.zip --
 | `app/` | `core.js` (model, realistic data, XBRL serialisation, validation, test report), `xlsx.js` (dependency-free .xlsx reader/writer), `index.template.html` (UI) |
 | `data/` | `appdata-vt17.json`, `appdata-vt15.json`: compiled taxonomy models, rules and base example messages |
 | `build/` | Scripts that compile the taxonomy packages into `data/` and build the template, scenario sets, HTML app and macOS app |
-| `tools/` | `generate_from_sets.js` (generate all scenario sets), `arelle_validate.py` (official validation with Arelle) |
+| `tools/` | `generate_from_sets.js` (generate all scenario sets and the mutation corpus), `mutants.js` (one report per business rule, changed to break it), `arelle_validate.py` (official validation with Arelle, compared rule by rule with the built-in check) |
 | `azure/` | Azure Function (Node 20, v4 model): `POST /api/generate` (files + test report), `GET /api/template` |
 | `test/` | Official examples, 700+ scenario tests, review tests, browser test, independent XSD check |
 | `.github/workflows/ci.yml` | Build, all tests and the Arelle validation on every push |
@@ -108,6 +112,8 @@ python3 build/build_rules.py <vt17 package dir> build/rules.json
 python3 build/build_appdata.py build/vt17_model.json <vt17 examples dir> data/appdata-vt17.json
 python3 build/build_uses.py data/appdata-vt17.json vt17
 # VT15: add "vt15" as last argument to build_model/build_rules/build_uses
+# after a change in build_rules.py only the rules need to be replaced:
+python3 build/inject_rules.py build/rules.json data/appdata-vt17.json
 ```
 
 ## Taxonomy content

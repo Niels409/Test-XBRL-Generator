@@ -146,14 +146,15 @@ for ep, e in model['entrypoints'].items():
     eps[ep] = {
         'href': e['href'],
         'roles': eroles,
-        'req': [{'c': x['concept'], 'x': x['explicit'], 't': x['typed'], 'n': x.get('not', []), 'm': x['msg']} for x in e['required']],
         'base': ex,
         'keys': keys,
     }
 
+# the formula assertions (value + existence) compiled by build_rules.py, next to the model json
 RULES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'rules.json')))
 for ep in eps:
-    eps[ep]['cond'] = RULES.get(ep, [])
+    eps[ep]['req'] = RULES['req'].get(ep, [])
+    eps[ep]['cond'] = RULES['cond'].get(ep, [])
 app = {'ns': model['namespaces'], 'concepts': concepts, 'roles': roles, 'eps': eps,
        'version': 'VT15 (20210421)' if 'vt15' in sys.argv[1] else 'VT17 (20240131, update 20260804)'}
 json.dump(app, open(OUT, 'w'), ensure_ascii=False, separators=(',', ':'))

@@ -52,14 +52,14 @@ jobs:
           retention-days: 30
 
   arelle:
-    name: Official validation (Arelle) ${{ matrix.part }}/4
+    name: Official validation (Arelle) ${{ matrix.part }}/8
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        part: [1, 2, 3, 4]
+        part: [1, 2, 3, 4, 5, 6, 7, 8]
     env:
       # Official SBR Nexus downloads (release bundles with the taxonomy package and the example messages).
       # Override with repository variables VT17_PACKAGE_URL / VT15_PACKAGE_URL if SBR Nexus moves them.
@@ -90,9 +90,10 @@ jobs:
           python3 tools/prepare_package.py dl/vt17.zip pkg/vt17.zip
           python3 tools/prepare_package.py dl/vt15.zip pkg/vt15.zip
           sha256sum pkg/*.zip
-      - name: Generate the scenario sets and the official examples
+      - name: Generate the scenario sets, the official examples and the mutation corpus
         run: |
           python3 build/scenario_sets.py data/appdata-vt17.json sets
+          # mutants: for every business rule one report changed so that it breaks that rule (see tools/mutants.js)
           node tools/generate_from_sets.js sets gen
           mkdir -p gen/official-examples
           for t in vt17 vt15; do for f in pkg/$t-examples/*.xbrl; do [ -e "$f" ] && cp "$f" "gen/official-examples/${t}_$(basename "$f")"; done; done
@@ -102,11 +103,17 @@ jobs:
         run: |
           mkdir -p x17 x15 && unzip -q pkg/vt17.zip -d x17 && unzip -q pkg/vt15.zip -d x15
           python3 test/xsd_check.py gen "$(ls -d x17/*/)" "$(ls -d x15/*/)"
-      - name: Validate with Arelle (part ${{ matrix.part }} of 4)
-        run: python3 tools/arelle_validate.py --packages pkg/vt17.zip pkg/vt15.zip --out arelle --expected gen/expected.json --jobs 4 --shard ${{ matrix.part }}/4 gen
+      - name: Validate with Arelle and compare with the built-in check (part ${{ matrix.part }} of 8)
+        run: python3 tools/arelle_validate.py --packages pkg/vt17.zip pkg/vt15.zip --out arelle --expected gen/expected.json --jobs 4 --shard ${{ matrix.part }}/8 gen
       - name: Summary
         if: always()
-        run: '[ -f arelle/summary.md ] && cat arelle/summary.md >> "$GITHUB_STEP_SUMMARY" || true'
+        run: |
+          [ -f arelle/summary.md ] && cat arelle/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+          cp gen/mutant-coverage.json arelle/ 2>/dev/null || true
+      - name: Data types of the Nederlandse Taxonomie used by the area rule (for build/build_rules.py NT_BASES)
+        if: always() && matrix.part == 1
+        run: |
+          find ~/.config/arelle/cache -name 'nl-types.xsd' | while read -r f; do echo "== $f"; grep -A4 'name="area20ItemType"' "$f" || true; done
       - name: Upload the Arelle results
         if: always()
         uses: actions/upload-artifact@v4
