@@ -9,6 +9,9 @@ Every row in the Excel becomes one XBRL file. Fields you leave empty are filled 
 It is meant for testing processes that receive valuation XBRLs (for example a lender's intake workflow). All generated data is fictitious,
 and every file starts with a comment that says so.
 
+**Rebuilding it elsewhere?** [`rebuild/`](rebuild/README.md) has everything to build the generator again in another environment and language
+(Python or Java): a functional specification, a build guide, the model files and an acceptance test of 30 scenarios.
+
 ## Use it
 
 1. Open `dist/Test XBRL Generator.html` in Chrome or Edge. It works offline; nothing is uploaded anywhere.
@@ -66,19 +69,9 @@ The sets are built by `build/scenario_sets.py`; in the app they are under step 1
 facets (including the Nederlandse Taxonomie types such as `StreetNameNL` max. 24 characters and the SBI code list), and **all business rules
 (formula assertions) of the taxonomy**: VT17 201 value assertions and 48 existence assertions, VT15 270 and 49. That covers the required
 fields, the conditional rules, the totals that must equal their parts (for example `ParkingLotsRented` = inside + outside) and the unit of
-areas. Every deviation names the rule it breaks, for example `[House_PrtSumOfChildren1]`.
-
-**Official validation (Arelle, on GitHub).** On every push, GitHub Actions generates all scenario sets and the official example messages and
-validates every file with [Arelle](https://arelle.org), the open-source XBRL processor, against the official SBR Nexus taxonomy packages:
-XML Schema, XBRL 2.1, dimensions and all formula assertions of the taxonomy. For every file the business rules that Arelle reports are
-compared with those of the built-in check; they must be identical. The comparison also runs on a mutation corpus (`tools/mutants.js`): for
-every rule that occurs in the generated reports, one report is changed so that it breaks that rule. The result is in the job summary and
-as a downloadable artifact. Run it locally with:
-
-```bash
-pip install arelle-release
-python3 tools/arelle_validate.py --packages VT17_package.zip VT15_package.zip --out arelle-results <xbrl files or folders>
-```
+areas. Every deviation names the rule it breaks, for example `[House_PrtSumOfChildren1]`. Up to version 2.1.0 the generated files and
+this check were also compared rule by rule with [Arelle](https://arelle.org) in CI (identical on 625 files); that comparison has been
+removed to keep the project simple.
 
 ## Repository layout
 
@@ -87,10 +80,11 @@ python3 tools/arelle_validate.py --packages VT17_package.zip VT15_package.zip --
 | `app/` | `core.js` (model, realistic data, XBRL serialisation, validation, test report), `xlsx.js` (dependency-free .xlsx reader/writer), `index.template.html` (UI) |
 | `data/` | `appdata-vt17.json`, `appdata-vt15.json`: compiled taxonomy models, rules and base example messages |
 | `build/` | Scripts that compile the taxonomy packages into `data/` and build the template, scenario sets, HTML app and macOS app |
-| `tools/` | `generate_from_sets.js` (generate all scenario sets and the mutation corpus), `mutants.js` (one report per business rule, changed to break it), `arelle_validate.py` (official validation with Arelle, compared rule by rule with the built-in check) |
+| `rebuild/` | Rebuild package: functional specification, build guide, model files, template, acceptance scenarios and expected results |
+| `tools/` | `export_rebuild.js` (generates `rebuild/` from this implementation), `rebuild_scenarios.json` (its acceptance scenarios), `check_acceptance.py` (acceptance check of generated files), `prepare_package.py` (extracts an SBR Nexus release bundle) |
 | `azure/` | Azure Function (Node 20, v4 model): `POST /api/generate` (files + test report), `GET /api/template` |
-| `test/` | Official examples, 700+ scenario tests, review tests, browser test, independent XSD check |
-| `.github/workflows/ci.yml` | Build, all tests and the Arelle validation on every push |
+| `test/` | Official examples, 700+ scenario tests, review tests, browser test, independent XSD check (needs the taxonomy packages) |
+| `.github/workflows/ci.yml` | Build, all tests and the rebuild package check on every push |
 
 ## Build and test
 
@@ -100,6 +94,7 @@ node test/base_check.js    # official SBR Nexus examples against the built-in ch
 node test/deep.js          # 700+ scenarios: use separation, VBO links, field mapping, XBRL structure, edge cases (FUZZ=n for more)
 node test/review.js        # content consistency, self-test with injected errors, EMPTY markers, structure vs official examples
 node test/ui.js            # end-to-end browser test (npm install --no-save playwright && npx playwright install chromium)
+node tools/export_rebuild.js --files out/acceptance && python3 tools/check_acceptance.py out/acceptance   # rebuild package + its acceptance test
 ```
 
 The built app is also attached to every CI run (artifact `test-xbrl-generator-<commit>`). Changes per version: [CHANGELOG.md](CHANGELOG.md).
@@ -120,8 +115,8 @@ python3 build/inject_rules.py build/rules.json data/appdata-vt17.json
 
 The VT17 and VT15 taxonomies and example messages are published by [SBR Nexus](https://www.sbrnexus.nl); the NT types by the Nederlandse Taxonomie.
 `data/` contains a compiled extract of them. The residential and agricultural parts that have no official example are synthetic (built from the
-taxonomy); no real valuation messages are included. The CI downloads the official taxonomy packages from sbrnexus.nl at run time; they are not
-stored in this repository. Check the SBR Nexus terms of use before reusing taxonomy content elsewhere.
+taxonomy); no real valuation messages are included. The taxonomy packages themselves are not stored in this repository. Check the SBR Nexus
+terms of use before reusing taxonomy content elsewhere.
 
 ## License
 

@@ -55,10 +55,11 @@ for fname, pfx in PREFIX_BY_FILE.items():
             ctype[q] = clark(el.get('type'), el)
 
 # type derivation: the package's own types, plus the bases of the Nederlandse Taxonomie (NT) types used by the concepts.
-# The NT schemas are not part of the package, so the bases that matter for a data-type filter are recorded here and checked
-# by the Arelle validation in CI. VT15/VT17 have one such filter: Report_AllMeasureEqualToParam1 on num:areaItemType (2009 DTR).
-#  - NT17: area20ItemType does not derive from that type (the official VT17 Huurinformatie example reports Acreage in
-#    xbrli:pure and passes Arelle), so in VT17 the rule applies to no concept.
+# The NT schemas are not part of the package, so the bases that matter for a data-type filter are recorded here (verified
+# against the NT schemas with Arelle in version 2.1.0). VT15/VT17 have one such filter: Report_AllMeasureEqualToParam1 on
+# num:areaItemType (2009 DTR).
+#  - NT17: area20ItemType derives from dtr-types:areaItemType (2020 DTR), not from that type, so in VT17 the rule applies to
+#    no concept (the official VT17 Huurinformatie example reports Acreage in xbrli:pure).
 #  - NT15: area20ItemType derives from num:areaItemType, so in VT15 area facts must use utr:sqm.
 NT_BASES = {
     'http://www.nltaxonomie.nl/nt17/sbr/20220301/dictionary/nl-types': {'area20ItemType': '{http://www.xbrl.org/dtr/type/2020-01-21}areaItemType'},

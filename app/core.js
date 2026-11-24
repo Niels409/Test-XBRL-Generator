@@ -7,7 +7,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
   const APP_NAME = 'Test XBRL Generator';
   const DIM_VBO = 'frc-vt-dim:BAGVBOIDAxis';
   const DIM_PAND = 'frc-vt-dim:BAGPANDIDAxis';
@@ -451,7 +451,7 @@
             if (ux) { if (ux[2] !== first) return false; ux[2] = `${name} 1`; }
             const vx = f.d.find(x => x[0] === DIM_VBO);
             if (vx) { if (!firstVid) return false; vx[2] = firstVid; }
-            if (f.c === 'frc-vt-i:LinkedBAGVBOID') { if (!firstVid) return false; f.v = firstVid; }
+            if (f.c === 'frc-vt-i:LinkedBAGVBOID') { if (!firstVid) return false; f.v = firstVid; f.fixedLink = true; }
             return true;
           });
           // overige koppelingen in het commerciële deel (bijv. contractregels): naar het eerste commerciële VBO
@@ -1275,7 +1275,7 @@
       ['Tests in the Excel', items.length], [RES.ok, n('ok')], [RES.deviations, n('deviations')], [RES.failed, n('failed')], ['', ''],
       ['Tests with an expected result', withExp.length], ['Outcome as expected', withExp.length - mism.length], ['Outcome NOT as expected', mism.length ? `${mism.length}: ${mism.map(i => i.sc.id).join(', ')}` : 0], ['', ''], ['Per data product', '']]
       .concat(Object.keys(per).sort().map(k => [k, per[k]]))
-      .concat([['', ''], ['Note', 'Deviations are found by the built-in check against the taxonomy (structure, data types and all business rules of the taxonomy: required fields, conditional rules, totals, units). It is not a certified XBRL validator; the automatic tests of the project compare these rules with Arelle.']]);
+      .concat([['', ''], ['Note', 'Deviations are found by the built-in check against the taxonomy (structure, data types and all business rules of the taxonomy: required fields, conditional rules, totals, units). It is not a certified XBRL validator.']]);
     return { stamp, mismatches: mism.length, sheets: [{ name: 'Test report', rows, widths: [8, 22, 44, 9, 22, 22, 16, 13, 18, 13, 14, 14, 12, 40, 24, 16, 10, 10, 70, 70, 70], header: true },
       { name: 'Summary', rows: summary, widths: [34, 60], header: true }] };
   }

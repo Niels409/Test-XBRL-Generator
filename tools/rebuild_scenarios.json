@@ -1,0 +1,660 @@
+{
+ "title": "Acceptance scenarios for a rebuilt generator (Taxatierapport, VT17 and VT15)",
+ "rows": [
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-01",
+   "report": "VR-ACC-01",
+   "use": "Residential",
+   "street": "Prinsengracht",
+   "nr": "263",
+   "add": "a",
+   "pc": "1017AB",
+   "vbos": [
+    [
+     "200000071001",
+     "Residential",
+     1250000
+    ]
+   ],
+   "date": "30-10-2026",
+   "kvk": "34567890",
+   "desc": "One home, all columns filled"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-02",
+   "report": "VR-ACC-02",
+   "use": "Residential",
+   "street": "Oudegracht",
+   "nr": "112",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071002",
+     "Residential",
+     310000
+    ],
+    [
+     "200000071003",
+     "Residential",
+     295000
+    ],
+    [
+     "200000071004",
+     "Residential",
+     405000
+    ]
+   ],
+   "date": "28-10-2026",
+   "kvk": "34567890",
+   "desc": "Three homes with their own market value; total = sum"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-03",
+   "report": "VR-ACC-03",
+   "use": "Commercial",
+   "street": "Coolsingel",
+   "nr": "40",
+   "add": "B",
+   "pc": "3011AD",
+   "vbos": [
+    [
+     "200000071005",
+     "Commercial",
+     2100000
+    ]
+   ],
+   "date": "27-10-2026",
+   "kvk": "24123456",
+   "desc": "One shop (commercial): one Ruimte"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-04",
+   "report": "VR-ACC-04",
+   "use": "Mixed use",
+   "street": "Keizersgracht",
+   "nr": "120",
+   "pc": "1015CX",
+   "vbos": [
+    [
+     "200000071006",
+     "Commercial",
+     2100000
+    ],
+    [
+     "200000071007",
+     "Residential",
+     950000
+    ],
+    [
+     "200000071008",
+     "Unlinked",
+     35000
+    ]
+   ],
+   "date": "28-10-2026",
+   "kvk": "56781234",
+   "desc": "Shop with a home above it and a parking space"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-05",
+   "report": "VR-ACC-05",
+   "use": "Agricultural",
+   "street": "Polderweg",
+   "nr": "7",
+   "pc": "2411NA",
+   "vbos": [
+    [
+     "200000071009",
+     "Agricultural",
+     3400000
+    ],
+    [
+     "200000071010",
+     "Unlinked",
+     150000
+    ]
+   ],
+   "date": "27-10-2026",
+   "kvk": "45671234",
+   "desc": "Farm with land"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-06",
+   "report": "VR-ACC-06",
+   "street": "Dorpsstraat",
+   "nr": "3",
+   "pc": "2411AB",
+   "vbos": [
+    [
+     "200000071011",
+     "Commercial",
+     800000
+    ],
+    [
+     "200000071012",
+     "Residential",
+     450000
+    ],
+    [
+     "200000071013",
+     "Agricultural",
+     1900000
+    ],
+    [
+     "200000071014",
+     "Unlinked",
+     60000
+    ]
+   ],
+   "date": "26-10-2026",
+   "kvk": "45671234",
+   "desc": "All four uses; report Use empty, so derived from the VBOs"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-07",
+   "use": "Residential",
+   "street": "Oudegracht",
+   "nr": "112",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071015",
+     "Residential",
+     250000
+    ],
+    [
+     "200000071016",
+     "Residential",
+     265000
+    ],
+    [
+     "200000071017",
+     "Residential",
+     280000
+    ],
+    [
+     "200000071018",
+     "Residential",
+     295000
+    ],
+    [
+     "200000071019",
+     "Residential",
+     310000
+    ]
+   ],
+   "date": "25-10-2026",
+   "kvk": "34567890",
+   "desc": "Five homes (maximum of the template)"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-08",
+   "use": "Residential",
+   "street": "Oudegracht",
+   "nr": "112",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071020",
+     "Residential",
+     ""
+    ],
+    [
+     "200000071021",
+     "Residential",
+     ""
+    ]
+   ],
+   "date": "25-10-2026",
+   "kvk": "34567890",
+   "desc": "Homes without market values: values are generated, total = sum"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-09",
+   "use": "Residential",
+   "desc": "Minimal row: only data product and Use (generated VBO, Process ID and valuation date)"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-10",
+   "use": "Residential",
+   "street": "Oudegracht",
+   "nr": "112",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071022",
+     "",
+     380000
+    ],
+    [
+     "200000071023",
+     "",
+     360000
+    ]
+   ],
+   "date": "today-14d",
+   "kvk": "34567890",
+   "desc": "Use only at report level; valuation date as an expression (today-14d)"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-11",
+   "street": "Stationsweg",
+   "nr": "5",
+   "pc": "3811AA",
+   "vbos": [
+    [
+     "200000071024",
+     "Unlinked",
+     30000
+    ]
+   ],
+   "date": "24-10-2026",
+   "kvk": "34567890",
+   "desc": "Only a parking space (Unlinked); no report Use"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-12",
+   "report": "EMPTY",
+   "use": "Residential",
+   "street": "EMPTY",
+   "nr": "12",
+   "pc": "EMPTY",
+   "vbos": [
+    [
+     "200000071025",
+     "Residential",
+     400000
+    ]
+   ],
+   "date": "24-10-2026",
+   "kvk": "EMPTY",
+   "desc": "Fields left out with EMPTY (valuer report ID, street, postcode, valuer CoC number)"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-13",
+   "use": "Residential",
+   "street": "Burgemeester van Walsumweg-Oost",
+   "nr": "1",
+   "pc": "3011AA",
+   "vbos": [
+    [
+     "200000071026",
+     "Residential",
+     500000
+    ]
+   ],
+   "date": "24-10-2026",
+   "kvk": "34567890",
+   "desc": "Street name of 31 characters (taxonomy maximum is 24)"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-14",
+   "use": "Residential",
+   "street": "Kerkstraat",
+   "nr": "1",
+   "pc": "AB1234",
+   "vbos": [
+    [
+     "200000071027",
+     "Residential",
+     500000
+    ]
+   ],
+   "date": "24-10-2026",
+   "kvk": "34567890",
+   "desc": "Invalid postcode"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-15",
+   "use": "Residential",
+   "street": "Kerkstraat",
+   "nr": "1",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071028",
+     "Residential",
+     500000
+    ]
+   ],
+   "date": "31-02-2026",
+   "kvk": "34567890",
+   "desc": "Valuation date that does not exist"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-16",
+   "use": "Residential",
+   "street": "Kerkstraat",
+   "nr": "1",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071029",
+     "Residential",
+     500000
+    ]
+   ],
+   "date": "24-10-2026",
+   "kvk": "1234",
+   "desc": "Valuer CoC number with 4 digits"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-17",
+   "use": "Residential",
+   "street": "Kerkstraat",
+   "nr": "1",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "ABC",
+     "Residential",
+     500000
+    ]
+   ],
+   "date": "24-10-2026",
+   "kvk": "34567890",
+   "desc": "VBO ID that is not a BAG ID (also used as Process ID)"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-18",
+   "use": "Residential",
+   "street": "Kerkstraat",
+   "nr": "1",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071030",
+     "Residential",
+     500000
+    ]
+   ],
+   "date": "today+30d",
+   "kvk": "34567890",
+   "desc": "Valuation date in the future"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-19",
+   "use": "Residential",
+   "street": "Kerkstraat",
+   "nr": "1",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071031",
+     "Residential",
+     300000
+    ],
+    [
+     "200000071031",
+     "Residential",
+     300000
+    ]
+   ],
+   "date": "24-10-2026",
+   "kvk": "34567890",
+   "desc": "The same VBO twice"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-20",
+   "use": "Residential",
+   "street": "Kerkstraat",
+   "nr": "12-B",
+   "pc": "3511 aw",
+   "vbos": [
+    [
+     "200000071032",
+     "Residential",
+     "1.250.000"
+    ],
+    [
+     "200000071033",
+     "Residential",
+     "950000,50"
+    ]
+   ],
+   "date": "2026-10-24",
+   "kvk": "34567890",
+   "desc": "Dutch number formats, house number with addition, postcode with a space, ISO date"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-21",
+   "use": "Hotel",
+   "street": "Kerkstraat",
+   "nr": "1",
+   "pc": "3511AW",
+   "vbos": [
+    [
+     "200000071034",
+     "",
+     500000
+    ]
+   ],
+   "date": "24-10-2026",
+   "kvk": "34567890",
+   "desc": "Unknown report Use"
+  },
+  {
+   "tax": "VT17",
+   "product": "Taxatierapport",
+   "case": "ACC17-24",
+   "report": "VR-ACC-24",
+   "use": "Mixed use",
+   "street": "Lindenlaan",
+   "nr": "9",
+   "pc": "2011AB",
+   "vbos": [
+    [
+     "200000071037",
+     "Residential",
+     620000
+    ],
+    [
+     "200000071038",
+     "Commercial",
+     1450000
+    ]
+   ],
+   "date": "26-10-2026",
+   "kvk": "34567890",
+   "desc": "Home as VBO 1 and shop as VBO 2: lease contracts link to the first commercial VBO"
+  },
+  {
+   "tax": "VT16",
+   "product": "Taxatierapport",
+   "case": "ACC17-22",
+   "use": "Residential",
+   "vbos": [
+    [
+     "200000071035",
+     "Residential",
+     500000
+    ]
+   ],
+   "desc": "Unknown taxonomy: not generated"
+  },
+  {
+   "tax": "VT17",
+   "product": "Opdrachtbrief",
+   "case": "ACC17-23",
+   "use": "Commercial",
+   "vbos": [
+    [
+     "200000071036",
+     "Commercial",
+     ""
+    ]
+   ],
+   "desc": "Other data product: not generated (only the Taxatierapport)"
+  },
+  {
+   "tax": "VT15",
+   "product": "Taxatierapport",
+   "case": "ACC15-01",
+   "report": "VR-ACC-51",
+   "use": "Residential",
+   "street": "Oudegracht",
+   "nr": "88",
+   "pc": "3511AV",
+   "vbos": [
+    [
+     "200000071051",
+     "Residential",
+     410000
+    ]
+   ],
+   "date": "29-10-2026",
+   "kvk": "67812345",
+   "desc": "VT15: one home"
+  },
+  {
+   "tax": "VT15",
+   "product": "Taxatierapport",
+   "case": "ACC15-02",
+   "report": "VR-ACC-52",
+   "use": "Commercial",
+   "street": "Coolsingel",
+   "nr": "40",
+   "add": "B",
+   "pc": "3011AD",
+   "vbos": [
+    [
+     "200000071052",
+     "Commercial",
+     2100000
+    ]
+   ],
+   "date": "27-10-2026",
+   "kvk": "24123456",
+   "desc": "VT15: one shop (VT15 links no VBO to a Ruimte)"
+  },
+  {
+   "tax": "VT15",
+   "product": "Taxatierapport",
+   "case": "ACC15-03",
+   "report": "VR-ACC-53",
+   "use": "Mixed use",
+   "street": "Keizersgracht",
+   "nr": "120",
+   "pc": "1015CX",
+   "vbos": [
+    [
+     "200000071053",
+     "Commercial",
+     2100000
+    ],
+    [
+     "200000071054",
+     "Residential",
+     950000
+    ]
+   ],
+   "date": "28-10-2026",
+   "kvk": "56781234",
+   "desc": "VT15: shop with a home above it; market value per part in the KPIs"
+  },
+  {
+   "tax": "VT15",
+   "product": "Taxatierapport",
+   "case": "ACC15-04",
+   "use": "Residential",
+   "street": "Oudegracht",
+   "nr": "88",
+   "pc": "3511AV",
+   "vbos": [
+    [
+     "200000071055",
+     "Residential",
+     410000
+    ],
+    [
+     "200000071056",
+     "Residential",
+     395000
+    ],
+    [
+     "200000071057",
+     "Unlinked",
+     25000
+    ]
+   ],
+   "date": "29-10-2026",
+   "kvk": "67812345",
+   "desc": "VT15: two homes and a parking space"
+  },
+  {
+   "tax": "VT15",
+   "product": "Taxatierapport",
+   "case": "ACC15-05",
+   "use": "Agricultural",
+   "vbos": [
+    [
+     "200000071058",
+     "Agricultural",
+     900000
+    ]
+   ],
+   "desc": "VT15 has no agricultural part: not generated"
+  },
+  {
+   "tax": "VT15",
+   "product": "Taxatierapport",
+   "case": "ACC15-06",
+   "use": "Residential",
+   "street": "Burgemeester van Walsumweg-Oost",
+   "nr": "1",
+   "pc": "EMPTY",
+   "vbos": [
+    [
+     "200000071059",
+     "Residential",
+     410000
+    ]
+   ],
+   "date": "29-10-2026",
+   "kvk": "67812345",
+   "desc": "VT15: street name too long and postcode left out"
+  }
+ ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "test-xbrl-generator",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Generates VT17 or VT15 (Vastgoedtaxonomie) test XBRL files from the Excel test-scenario template. Same generator as the Test XBRL Generator desktop app.",
   "main": "src/functions/generate.js",
   "scripts": {

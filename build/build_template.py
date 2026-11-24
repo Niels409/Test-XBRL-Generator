@@ -36,7 +36,8 @@ N_VBO = 5
 COLS = [
     # (kop, breedte, groep, hulptekst)
     ('Taxonomy', 11, 0, 'VT17 or VT15. Empty = VT17. VT15 has a completely different structure; the XBRL is built in the chosen taxonomy.'),
-    ('Data product *', 24, 0, 'Pick the data product from the list (Taxatierapport = valuation report, Opdrachtbrief = engagement letter). Same names in VT17 and VT15.'),
+    ('Data product *', 24, 0, 'Taxatierapport (valuation report).' if len(APP['eps']) == 1 else
+     'Pick the data product from the list (Taxatierapport = valuation report, Opdrachtbrief = engagement letter). Same names in VT17 and VT15.'),
     ('Case / Reference ID', 24, 0, 'Case ID used to find the file in the workflow tooling. Written to the assignment reference (SBR reference). Also used in the file name.'),
     ('Valuer report ID', 20, 0, "The valuer's own report number. Written to the contractor reference, allocated by the valuer."),
     ('Use (report)', 16, 0, 'Commercial, Residential, Mixed use or Agricultural (Agricultural: VT17 only). Written to "Commercieel en/of residentieel" and the default for every VBO without its own Use. Empty = derived from the VBO uses.'),
@@ -249,4 +250,21 @@ ws.print_title_rows = f'{HEADER_ROW - 1}:{HEADER_ROW}'
 ws.sheet_view.selection[0].activeCell = f'A{FIRST + len(examples)}'
 ws.sheet_view.selection[0].sqref = f'A{FIRST + len(examples)}'
 wb.save(OUT)
+
+
+def reproducible(path):
+    """Fixed timestamps in the workbook properties and the zip entries: the same input gives the same bytes (no noise in git)."""
+    import re, zipfile
+    with zipfile.ZipFile(path) as z:
+        items = [(i, z.read(i.filename)) for i in z.infolist()]
+    with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as z:
+        for info, data in items:
+            if info.filename == 'docProps/core.xml':
+                data = re.sub(rb'(<dcterms:(?:created|modified)[^>]*>)[^<]*', rb'\g<1>2026-01-01T00:00:00Z', data)
+            zi = zipfile.ZipInfo(info.filename, date_time=(2026, 1, 1, 0, 0, 0))
+            zi.compress_type, zi.external_attr = zipfile.ZIP_DEFLATED, info.external_attr
+            z.writestr(zi, data)
+
+
+reproducible(OUT)
 print('sjabloon', OUT)

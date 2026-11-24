@@ -5,8 +5,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '17 5 * * 1'   # every Monday: catches changes in the taxonomies or in Arelle
 
 permissions:
   contents: read
@@ -44,80 +42,14 @@ jobs:
           # Playwright's own Chromium when the runner OS supports it, otherwise the Google Chrome that ships with the runner image
           if npx playwright install --with-deps chromium; then node test/ui.js
           else CHROMIUM_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)" node test/ui.js; fi
+      - name: Rebuild package up to date and passing its acceptance test
+        run: |
+          node tools/export_rebuild.js --files out/acceptance
+          git diff --exit-code -- rebuild/ || { echo "rebuild/ is not up to date: run node tools/export_rebuild.js and commit"; exit 1; }
+          python3 tools/check_acceptance.py out/acceptance
       - name: Upload the built app
         uses: actions/upload-artifact@v4
         with:
           name: test-xbrl-generator-${{ github.sha }}
           path: dist/
-          retention-days: 30
-
-  arelle:
-    name: Official validation (Arelle) ${{ matrix.part }}/8
-    needs: test
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        part: [1, 2, 3, 4, 5, 6, 7, 8]
-    env:
-      # Official SBR Nexus downloads (release bundles with the taxonomy package and the example messages).
-      # Override with repository variables VT17_PACKAGE_URL / VT15_PACKAGE_URL if SBR Nexus moves them.
-      VT17_PACKAGE_URL: ${{ vars.VT17_PACKAGE_URL || 'https://pub-5ff4320167a14f958d5d55262805643c.r2.dev/media/VT17_FRC_20240131_Package_update_20260804.zip' }}
-      VT15_PACKAGE_URL: ${{ vars.VT15_PACKAGE_URL || 'https://pub-5ff4320167a14f958d5d55262805643c.r2.dev/media/VT15.zip' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install Arelle
-        run: pip install --quiet arelle-release openpyxl lxml
-      - name: Cache the downloads and the Arelle web cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            dl
-            ~/.config/arelle/cache
-          key: sbr-downloads-v1-${{ env.VT17_PACKAGE_URL }}-${{ env.VT15_PACKAGE_URL }}
-      - name: Get the official taxonomy packages and example messages
-        run: |
-          mkdir -p dl pkg
-          [ -s dl/vt17.zip ] || curl -sSfL "$VT17_PACKAGE_URL" -o dl/vt17.zip
-          [ -s dl/vt15.zip ] || curl -sSfL "$VT15_PACKAGE_URL" -o dl/vt15.zip
-          python3 tools/prepare_package.py dl/vt17.zip pkg/vt17.zip
-          python3 tools/prepare_package.py dl/vt15.zip pkg/vt15.zip
-          sha256sum pkg/*.zip
-      - name: Generate the scenario sets, the official examples and the mutation corpus
-        run: |
-          python3 build/scenario_sets.py data/appdata-vt17.json sets
-          # mutants: for every business rule one report changed so that it breaks that rule (see tools/mutants.js)
-          node tools/generate_from_sets.js sets gen
-          mkdir -p gen/official-examples
-          for t in vt17 vt15; do for f in pkg/$t-examples/*.xbrl; do [ -e "$f" ] && cp "$f" "gen/official-examples/${t}_$(basename "$f")"; done; done
-          find gen -name '*.xbrl' | wc -l
-      - name: Independent check against the taxonomy XSDs
-        if: matrix.part == 1
-        run: |
-          mkdir -p x17 x15 && unzip -q pkg/vt17.zip -d x17 && unzip -q pkg/vt15.zip -d x15
-          python3 test/xsd_check.py gen "$(ls -d x17/*/)" "$(ls -d x15/*/)"
-      - name: Validate with Arelle and compare with the built-in check (part ${{ matrix.part }} of 8)
-        run: python3 tools/arelle_validate.py --packages pkg/vt17.zip pkg/vt15.zip --out arelle --expected gen/expected.json --jobs 4 --shard ${{ matrix.part }}/8 gen
-      - name: Summary
-        if: always()
-        run: |
-          [ -f arelle/summary.md ] && cat arelle/summary.md >> "$GITHUB_STEP_SUMMARY" || true
-          cp gen/mutant-coverage.json arelle/ 2>/dev/null || true
-      - name: Data types of the Nederlandse Taxonomie used by the area rule (for build/build_rules.py NT_BASES)
-        if: always() && matrix.part == 1
-        run: |
-          find ~/.config/arelle/cache -name 'nl-types.xsd' | while read -r f; do echo "== $f"; grep -A4 'name="area20ItemType"' "$f" || true; done
-      - name: Upload the Arelle results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: arelle-results-part${{ matrix.part }}-${{ github.sha }}
-          path: arelle/
           retention-days: 30

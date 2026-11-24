@@ -1,0 +1,11 @@
+{
+ "test": "ACC15-05",
+ "description": "VT15 has no agricultural part: not generated",
+ "row": 39,
+ "taxonomy": "VT15",
+ "status": "failed",
+ "inputChecks": [
+  "E03",
+  "W14"
+ ]
+}

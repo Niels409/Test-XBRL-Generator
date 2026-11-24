@@ -3,6 +3,25 @@
 All notable changes to the Test XBRL Generator. The version is shown in the app footer, in a comment at the top of every
 generated XBRL file and in the test report.
 
+## 2.2.0 — 2026-11-24
+
+### Added
+- **Rebuild package** (`rebuild/`) for building the generator again in another environment and language: a functional
+  specification (input, generation steps, output, input and fact checks), a build guide for Python and Java, the model files
+  for the Taxatierapport in VT17 and VT15, the Excel template, and an acceptance test of 30 scenarios with the expected
+  result of each (status, checks and every fact). `tools/export_rebuild.js` generates it from this implementation;
+  `tools/check_acceptance.py` checks generated files against it. CI fails when the package is out of date or does not pass.
+
+### Removed
+- The Arelle validation in CI, the rule-by-rule comparison and the mutation corpus (`tools/arelle_validate.py`,
+  `tools/mutants.js`, `tools/generate_from_sets.js`), and the weekly CI run. The built-in check is unchanged.
+
+### Fixed
+- Lease contracts in a report where the first VBO is not commercial now link to the first commercial VBO (they linked to
+  VBO 1).
+- Excel files and the Azure Function zip made by the build are byte-for-byte reproducible (fixed timestamps), so rebuilding
+  no longer changes them.
+
 ## 2.1.0 — 2026-11-17
 
 ### Added

@@ -1,0 +1,10 @@
+{
+ "test": "ACC17-23",
+ "description": "Other data product: not generated (only the Taxatierapport)",
+ "row": 34,
+ "taxonomy": "VT17",
+ "status": "failed",
+ "inputChecks": [
+  "E02"
+ ]
+}
