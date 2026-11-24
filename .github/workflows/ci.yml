@@ -45,7 +45,8 @@ jobs:
       - name: Rebuild package up to date and passing its acceptance test
         run: |
           node tools/export_rebuild.js --files out/acceptance
-          git diff --exit-code -- rebuild/ || { echo "rebuild/ is not up to date: run node tools/export_rebuild.js and commit"; exit 1; }
+          # .xlsx bytes depend on the openpyxl and zlib versions; their content is covered by the expected results read from them
+          git diff --exit-code -- rebuild/ ':(exclude)*.xlsx' || { echo "rebuild/ is not up to date: run node tools/export_rebuild.js and commit"; exit 1; }
           python3 tools/check_acceptance.py out/acceptance
       - name: Upload the built app
         uses: actions/upload-artifact@v4
