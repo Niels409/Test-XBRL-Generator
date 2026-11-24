@@ -89,9 +89,8 @@ example messages (build scripts in `build/`, reference implementation). JSON, sa
 { "tax": "VT17",
   "ns": { prefix: namespace URI },                         used for the namespace declarations
   "concepts": { "<prefix:Name>": {
-      "l": label, "p": "i" (instant) | "d" (duration), "k": kind,
+      "l": label, "doc": documentation, "p": "i" (instant) | "d" (duration), "k": kind,
       "e": [[code, label], ...],                           allowed values (kind enum, or an enumeration facet)
-      "set": true,                                         kind enumSet: value is a space separated list of codes
       "maxLength", "minLength", "pattern", "minInclusive", "maxInclusive": facets (strings) } },
   "roles": { "<role id>": {                                hypercubes: which dimensions a concept may have
       "l": label, "u": role URI,
@@ -195,7 +194,8 @@ has the use, one copy `<Name> 1` is made without the facts that have `BAGVBOIDAx
 For c, the lease contracts point to the first commercial unit and VBO. Every fact with `LeaseContractAxis`: with the unit
 axis it is kept only for the template member (renamed `Ruimte 1`); a `BAGVBOIDAxis` member and a `LinkedBAGVBOID` value
 become the first commercial VBO (the fact is removed when no VBO is commercial). Other `LinkedBAGVBOID` facts of the
-commercial part (`g` = c, without unit and VBO axis) also get the first commercial VBO (removed when there is none). (VT15 has no `BAGVBOIDAxis` facts in the unit part: a Ruimte is never linked to a VBO.)
+commercial part (`g` = c, without unit and VBO axis) also get the first commercial VBO (removed when there is none).
+VT15 has no `BAGVBOIDAxis` facts in the unit part: there a Ruimte is never linked to a VBO.
 
 **6.9 Realistic values.** Dates (kind date) move by the shift of their source; `DocumentCreationDate` = today.
 A `LinkedBAGVBOID` not set by the lease rule of 6.8 = the member of its `BAGVBOIDAxis`, else the VBO it was copied for
@@ -229,8 +229,7 @@ axes = their first member), unit by kind, decimals `INF`. A field key that does 
 **6.11 Columns.** Before writing: VBOs without a market value get a generated value (residential 180,000–600,000; commercial
 400,000–2,500,000; agricultural 1,000,000–4,000,000; unlinked 20,000–150,000; in steps of 10,000). Total market value =
 the rounded sum of all VBO values (EMPTY and non-numeric values count as 0; when every VBO value is EMPTY no total is
-written). When *Use (report)* is empty it becomes `5` if *uses* has a,
-else `3` if c and r, else `2` if r, else `1`. A postcode `1234 ab` becomes `1234AB`; a house number `12-B` gives number `12`
+written). When *Use (report)* is empty it becomes `5` if *uses* has a, else `3` if c and r, else `2` if r, else `1`. A postcode `1234 ab` becomes `1234AB`; a house number `12-B` gives number `12`
 and, when the addition column is empty, addition `B`. Then, in this order:
 
 | Value | Field key(s) | Conversion / extra |
@@ -256,8 +255,9 @@ HousesAcreage HousesAmount RightsAmount OtherLand`); `IPDSubtype` is kept only f
 
 **6.13 Market value per VBO.** Only residential units have a value per unit. For each residential VBO with its Eenheid:
 EMPTY value → remove its `MarketValueVHE`; otherwise `MarketValueVHE` = the given value (rounded to whole euros; W17 and
-written as given when it is not a number, W18 when negative) or the generated value, `UsableFloorArea` and `MarketRent` = realistic values (reference: area = value / 6000 rounded to 5 within
-30–400; rent = 4 % of the value rounded to 100, min. 1200). Each is set on the Eenheid's facts with only `HouseAxis`
+written as given when it is not a number, W18 when negative) or the generated value; `UsableFloorArea` and `MarketRent`
+get realistic values (reference: area = value / 6000 rounded to 5 within 30–400; rent = 4 % of the value rounded to 100,
+min. 1200). Each is set on the Eenheid's facts with only `HouseAxis`
 (and `HouseTypeAxis`), or added with their dimensions. **VT15** also writes the total per part to *KPI's van het
 taxatieresultaat commercieel › Marktwaarde k.k. (afgerond)* and *… residentieel …*, for each use c / r in *uses*: the sum of
 the given values of that use when there are several uses (the total when that sum is 0), else the total.
@@ -309,7 +309,7 @@ Messages are free text; they name the column, the value and what happens. A row 
 | F01 | The concept exists in the model |
 | F02 | The dimensions fit one of the data product's roles that lists the concept (same axes; explicit member allowed) |
 | F03 | Numeric kinds have a unit, others none; monetary uses `iso4217:XXX` |
-| F04 | The value fits the kind (date `yyyy-mm-dd` that exists; gYear `yyyy`; duration `P…`; integer; decimal number; enum code; boolean) and the facets (`e` allowed values, also for enumSet tokens; `minInclusive`, `maxInclusive`, `maxLength`, `minLength`, `pattern` as a full match) |
+| F04 | The value fits the kind (date `yyyy-mm-dd` that exists; gYear `yyyy`; duration `P…`; integer; decimal number; enum code; boolean) and the facets (`e` allowed values; `minInclusive`, `maxInclusive`, `maxLength`, `minLength`, `pattern` as a full match). enumSet values are not checked |
 | F05 | Warning only: empty text value |
 | F06 | A typed dimension has a value |
 | F07 | No two facts with the same concept and dimensions |
