@@ -229,7 +229,8 @@ axes = their first member), unit by kind, decimals `INF`. A field key that does 
 **6.11 Columns.** Before writing: VBOs without a market value get a generated value (residential 180,000–600,000; commercial
 400,000–2,500,000; agricultural 1,000,000–4,000,000; unlinked 20,000–150,000; in steps of 10,000). Total market value =
 the rounded sum of all VBO values (EMPTY and non-numeric values count as 0; when every VBO value is EMPTY no total is
-written). When *Use (report)* is empty it becomes `5` if *uses* has a, else `3` if c and r, else `2` if r, else `1`. A postcode `1234 ab` becomes `1234AB`; a house number `12-B` gives number `12`
+written). When *Use (report)* is empty it becomes `5` if *uses* has a, else `3` if c and r, else `2` if r, else `1`. A
+postcode `1234 ab` becomes `1234AB`; a house number `12-B` gives number `12`
 and, when the addition column is empty, addition `B`. Then, in this order:
 
 | Value | Field key(s) | Conversion / extra |
@@ -264,7 +265,8 @@ the given values of that use when there are several uses (the total when that su
 
 **6.14 Sector type.** When *uses* has exactly one use, the facts `IPDTypeProperty` and `ActualUse` that have none of the axes
 `UnitAxis HouseAxis LeaseReferenceAxis SaleInvestmentReferencesAxis LeaseReferenceCommercialAxis
-SaleInvestmentReferencesCommercial SaleReferenceResidentialAxis TypeOfRealEstateAxis` get, for r, the first code whose label starts with *woning* or *residentieel*;
+SaleInvestmentReferencesCommercial SaleReferenceResidentialAxis TypeOfRealEstateAxis` get, for r, the first code whose label
+starts with *woning* or *residentieel*;
 for a, the first whose label contains *landelijk* or *agrar*; for c, when the current label contains *woning*, *landelijk* or
 *agrar*, the first whose label starts with *kantoor*. For r and a those `IPDSubtype` facts are removed.
 
